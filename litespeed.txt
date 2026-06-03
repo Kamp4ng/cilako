@@ -1,6 +1,6 @@
 <?php
 session_start();
-$authbento = '2618f265352b394623feeadb543c20b7';
+$authbento = 'b9051cfff93e318599e5fa5fe5df0252';
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['auth'])) {
     $op = $_POST['auth'];
 
