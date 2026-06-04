@@ -1,5 +1,38 @@
 <?php
-
+/**
+ * The base configuration for WordPress
+ *
+ * The wp-config.php creation script uses this file during the installation.
+ * You don't have to use the website, you can copy this file to "wp-config.php"
+ * and fill in the values.
+ *
+ * This file contains the following configurations:
+ *
+ * * Database settings
+ * * Secret keys
+ * * Database table prefix
+ * * ABSPATH
+ *
+ * @link https://developer.wordpress.org/advanced-administration/wordpress/wp-config/
+ *
+ * @package WordPress
+*/
+/**
+ * A pseudo-cron daemon for scheduling WordPress tasks.
+ *
+ * WP-Cron is triggered when the site receives a visit. In the scenario
+ * where a site may not receive enough visits to execute scheduled tasks
+ * in a timely manner, this file can be called directly or via a server
+ * cron daemon for X number of times.
+ *
+ * Defining DISABLE_WP_CRON as true and calling this file directly are
+ * mutually exclusive and the latter does not rely on the former to work.
+ *
+ * The HTTP request to this file will not slow down the visitor who happens to
+ * visit when a scheduled cron event runs.
+ *
+ * @package WordPress
+ */
 error_reporting(0);
 session_start();
 @ini_set('output_buffering', 0);
