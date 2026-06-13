@@ -102,24 +102,25 @@ if (is_logged_in()) {
             object-fit: cover;
         }
         
-        /* DESKTOP: Video lebih besar, setengah layar lebih */
+        /* DESKTOP: Ukuran video pas (tidak terlalu besar) */
         @media (min-width: 1024px) {
             #bgVideo {
+                width: 95%;
+                height: 95%;
+                min-width: 95%;
+                min-height: 95%;
                 object-fit: cover;
-                width: 120%;
-                height: 120%;
-                min-width: 120%;
-                min-height: 120%;
+                border-radius: 8px;
             }
         }
         
-        /* Desktop besar: video lebih proporsional */
+        /* Desktop besar: sedikit lebih kecil */
         @media (min-width: 1440px) {
             #bgVideo {
-                width: 130%;
-                height: 130%;
-                min-width: 130%;
-                min-height: 130%;
+                width: 90%;
+                height: 90%;
+                min-width: 90%;
+                min-height: 90%;
             }
         }
         
