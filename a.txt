@@ -105,20 +105,20 @@ if (is_logged_in()) {
             object-fit: cover;
         }
         
-        /* DESKTOP: Video proporsional - lebar 70%, tinggi auto */
+        /* DESKTOP: Ukuran video BAGUS dan PAS */
         @media (min-width: 1024px) {
             #bgVideo {
                 position: relative;
                 top: 0;
                 left: 0;
                 transform: none;
-                width: 70%;
+                width: 85%;
                 height: auto;
-                max-height: 85vh;
+                max-height: 90vh;
                 object-fit: contain;
-                border-radius: 16px;
-                box-shadow: 0 15px 40px rgba(0,0,0,0.6);
-                margin: auto;
+                border-radius: 20px;
+                box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+                border: 2px solid rgba(255,255,255,0.1);
             }
             
             .video-container {
@@ -128,19 +128,19 @@ if (is_logged_in()) {
             }
         }
         
-        /* Desktop besar: lebar 65% */
-        @media (min-width: 1440px) {
+        /* Desktop besar: sedikit lebih besar */
+        @media (min-width: 1600px) {
             #bgVideo {
-                width: 65%;
-                max-height: 85vh;
+                width: 80%;
+                max-height: 90vh;
             }
         }
         
-        /* Laptop kecil: lebar 75% */
-        @media (min-width: 1024px) and (max-width: 1280px) {
+        /* Laptop: 90% */
+        @media (min-width: 1024px) and (max-width: 1366px) {
             #bgVideo {
-                width: 75%;
-                max-height: 80vh;
+                width: 90%;
+                max-height: 85vh;
             }
         }
         
@@ -160,14 +160,14 @@ if (is_logged_in()) {
         /* Sound Control Button */
         .sound-control {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: 25px;
+            right: 25px;
             z-index: 30;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.6);
             backdrop-filter: blur(8px);
             border-radius: 50%;
-            width: 45px;
-            height: 45px;
+            width: 50px;
+            height: 50px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -177,25 +177,25 @@ if (is_logged_in()) {
         }
         
         .sound-control:hover {
-            background: rgba(103,0,90,0.7);
+            background: rgba(103,0,90,0.8);
             transform: scale(1.05);
         }
         
         .sound-control svg {
-            width: 22px;
-            height: 22px;
+            width: 24px;
+            height: 24px;
             fill: white;
         }
         
         /* Container Login - TRANSPARAN */
         .container {
             width: 100%;
-            max-width: 340px;
-            padding: 28px 24px;
-            background: rgba(0, 0, 0, 0.45);
-            backdrop-filter: blur(12px);
+            max-width: 360px;
+            padding: 30px 26px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(15px);
             border-radius: 24px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.08);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08);
             color: white;
             text-align: center;
             z-index: 20;
@@ -207,9 +207,9 @@ if (is_logged_in()) {
         /* Desktop: container lebih lebar */
         @media (min-width: 1280px) {
             .container {
-                max-width: 380px;
-                padding: 32px 30px;
-                background: rgba(0, 0, 0, 0.4);
+                max-width: 400px;
+                padding: 35px 30px;
+                background: rgba(0, 0, 0, 0.45);
             }
         }
         
@@ -225,36 +225,36 @@ if (is_logged_in()) {
         }
         
         .container h2 {
-            margin-bottom: 6px;
-            font-size: 26px;
+            margin-bottom: 8px;
+            font-size: 28px;
             font-weight: 600;
             color: #fff;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
         
         .container .subtitle {
-            font-size: 11px;
+            font-size: 12px;
             color: rgba(255,255,255,0.7);
-            margin-bottom: 24px;
+            margin-bottom: 25px;
             letter-spacing: 0.3px;
         }
         
         .input-group {
-            margin-bottom: 16px;
+            margin-bottom: 18px;
             text-align: left;
         }
         
         .input-group label {
             display: block;
-            font-size: 12px;
+            font-size: 13px;
             margin-bottom: 6px;
-            color: rgba(255,255,255,0.8);
+            color: rgba(255,255,255,0.85);
             font-weight: 500;
         }
         
         input {
             width: 100%;
-            padding: 12px 14px;
+            padding: 13px 15px;
             border-radius: 12px;
             border: 1px solid rgba(255,255,255,0.2);
             background: rgba(255,255,255,0.1);
@@ -268,33 +268,33 @@ if (is_logged_in()) {
         input:focus {
             border-color: #9b3a8a;
             background: rgba(255,255,255,0.15);
-            box-shadow: 0 0 10px rgba(155,58,138,0.3);
+            box-shadow: 0 0 12px rgba(155,58,138,0.3);
         }
         
         input::placeholder {
             color: rgba(255,255,255,0.5);
-            font-size: 12px;
+            font-size: 13px;
         }
         
         button {
             width: 100%;
-            padding: 12px;
+            padding: 13px;
             background: linear-gradient(105deg, #7a0a68, #4a0a3a);
             border: none;
             border-radius: 12px;
             color: white;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 15px;
             cursor: pointer;
             transition: all 0.25s ease;
-            margin-top: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            margin-top: 15px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.3);
         }
         
         button:hover {
-            transform: translateY(-1px);
+            transform: translateY(-2px);
             background: linear-gradient(105deg, #8f0f7a, #5a0f48);
-            box-shadow: 0 6px 15px rgba(122,10,104,0.4);
+            box-shadow: 0 10px 20px rgba(122,10,104,0.4);
         }
         
         button:active {
@@ -315,9 +315,9 @@ if (is_logged_in()) {
         /* Tablet */
         @media (max-width: 768px) {
             .container {
-                max-width: 320px;
-                padding: 24px 22px;
-                background: rgba(0, 0, 0, 0.5);
+                max-width: 330px;
+                padding: 25px 22px;
+                background: rgba(0, 0, 0, 0.55);
             }
             
             .container h2 {
@@ -337,7 +337,7 @@ if (is_logged_in()) {
             .container {
                 max-width: 88%;
                 padding: 22px 20px;
-                background: rgba(0, 0, 0, 0.55);
+                background: rgba(0, 0, 0, 0.6);
             }
             
             .container h2 {
@@ -345,23 +345,25 @@ if (is_logged_in()) {
             }
             
             .subtitle {
-                font-size: 10px;
+                font-size: 11px;
                 margin-bottom: 20px;
             }
             
             input {
-                padding: 10px 12px;
+                padding: 11px 13px;
                 font-size: 13px;
             }
             
             button {
-                padding: 10px;
-                font-size: 13px;
+                padding: 11px;
+                font-size: 14px;
             }
             
             .sound-control {
-                width: 40px;
-                height: 40px;
+                width: 42px;
+                height: 42px;
+                bottom: 20px;
+                right: 20px;
             }
         }
         
@@ -384,8 +386,8 @@ if (is_logged_in()) {
         }
         
         .loading-spinner {
-            width: 36px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
             border: 3px solid rgba(255,255,255,0.2);
             border-top-color: #9b3a8a;
             border-radius: 50%;
@@ -399,12 +401,12 @@ if (is_logged_in()) {
         
         .volume-indicator {
             position: fixed;
-            bottom: 80px;
-            right: 28px;
-            background: rgba(0,0,0,0.5);
-            padding: 5px 12px;
+            bottom: 90px;
+            right: 30px;
+            background: rgba(0,0,0,0.55);
+            padding: 6px 14px;
             border-radius: 30px;
-            font-size: 11px;
+            font-size: 12px;
             color: white;
             z-index: 30;
             transition: opacity 0.25s ease;
@@ -414,8 +416,8 @@ if (is_logged_in()) {
         
         @media (max-width: 480px) {
             .volume-indicator {
-                bottom: 72px;
-                right: 22px;
+                bottom: 78px;
+                right: 24px;
                 font-size: 10px;
                 padding: 4px 10px;
             }
@@ -430,7 +432,7 @@ if (is_logged_in()) {
     
     <div class="video-container">
         <video id="bgVideo" autoplay loop muted playsinline>
-            <source src="https://kawi898berjuang.com/newupdate/sora.mp4" type="video/mp4" />
+            <source src="https://kawi898berjuang.com/newupdate/feel.mp4" type="video/mp4" />
         </video>
     </div>
     
@@ -473,7 +475,7 @@ if (is_logged_in()) {
             function showMsg(msg, isOnStyle) {
                 volumeIndicator.textContent = msg;
                 volumeIndicator.style.opacity = '1';
-                volumeIndicator.style.backgroundColor = isOnStyle ? 'rgba(122,10,104,0.8)' : 'rgba(0,0,0,0.55)';
+                volumeIndicator.style.backgroundColor = isOnStyle ? 'rgba(122,10,104,0.85)' : 'rgba(0,0,0,0.6)';
                 clearTimeout(indicatorTimeout);
                 indicatorTimeout = setTimeout(() => {
                     volumeIndicator.style.opacity = '0';
