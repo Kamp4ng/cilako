@@ -73,14 +73,14 @@ if (is_logged_in()) {
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background: #0a0a0a;
+            background: #000;
             display: flex;
             justify-content: center;
             align-items: center;
             position: relative;
         }
         
-        /* Video Container - Full Screen */
+        /* Video Container */
         .video-container {
             position: fixed;
             top: 0;
@@ -88,6 +88,7 @@ if (is_logged_in()) {
             width: 100%;
             height: 100%;
             overflow: hidden;
+            background: #000;
             z-index: 0;
         }
         
@@ -99,19 +100,17 @@ if (is_logged_in()) {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            filter: brightness(0.6) contrast(1.1);
         }
         
-        /* Desktop: video lebih halus */
+        /* DESKTOP: Video tidak terpotong */
         @media (min-width: 1024px) {
             #bgVideo {
-                object-fit: cover;
-                width: 100%;
-                height: 100%;
+                object-fit: contain;
+                background: #000;
             }
         }
         
-        /* Overlay Gradient - Lebih soft di desktop */
+        /* Overlay sangat tipis */
         .video-container::after {
             content: '';
             position: absolute;
@@ -119,7 +118,7 @@ if (is_logged_in()) {
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.3) 100%);
+            background: rgba(0,0,0,0.25);
             pointer-events: none;
             z-index: 1;
         }
@@ -127,44 +126,42 @@ if (is_logged_in()) {
         /* Sound Control Button */
         .sound-control {
             position: fixed;
-            bottom: 25px;
-            right: 25px;
+            bottom: 20px;
+            right: 20px;
             z-index: 30;
-            background: rgba(0,0,0,0.55);
-            backdrop-filter: blur(10px);
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(8px);
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 45px;
+            height: 45px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.25s ease;
             border: 1px solid rgba(255,255,255,0.2);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
         
         .sound-control:hover {
-            background: rgba(103,0,90,0.8);
-            transform: scale(1.08);
-            border-color: rgba(103,0,90,0.8);
+            background: rgba(103,0,90,0.6);
+            transform: scale(1.05);
         }
         
         .sound-control svg {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             fill: white;
         }
         
-        /* Container Login - Desktop optimasi */
+        /* Container Login - SANGAT TRANSPARAN */
         .container {
             width: 100%;
             max-width: 340px;
-            padding: 28px 26px;
-            background: rgba(10, 10, 10, 0.6);
-            backdrop-filter: blur(15px);
+            padding: 28px 24px;
+            background: rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(10px);
             border-radius: 24px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.08);
             color: white;
             text-align: center;
             z-index: 20;
@@ -173,11 +170,12 @@ if (is_logged_in()) {
             border: 1px solid rgba(255,255,255,0.1);
         }
         
-        /* Desktop: container lebih lebar dikit */
+        /* Desktop: container sedikit lebih lebar */
         @media (min-width: 1280px) {
             .container {
-                max-width: 380px;
-                padding: 32px 30px;
+                max-width: 360px;
+                padding: 30px 28px;
+                background: rgba(0, 0, 0, 0.3);
             }
         }
         
@@ -193,18 +191,17 @@ if (is_logged_in()) {
         }
         
         .container h2 {
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             font-size: 26px;
             font-weight: 600;
-            letter-spacing: -0.3px;
             color: #fff;
-            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
         
         .container .subtitle {
-            font-size: 12px;
+            font-size: 11px;
             color: rgba(255,255,255,0.7);
-            margin-bottom: 25px;
+            margin-bottom: 24px;
             letter-spacing: 0.3px;
         }
         
@@ -217,9 +214,8 @@ if (is_logged_in()) {
             display: block;
             font-size: 12px;
             margin-bottom: 6px;
-            color: rgba(255,255,255,0.85);
+            color: rgba(255,255,255,0.8);
             font-weight: 500;
-            letter-spacing: 0.3px;
         }
         
         input {
@@ -227,24 +223,23 @@ if (is_logged_in()) {
             padding: 12px 14px;
             border-radius: 12px;
             border: 1px solid rgba(255,255,255,0.2);
-            background: rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.1);
             outline: none;
             font-size: 14px;
             color: white;
             transition: all 0.2s ease;
             box-sizing: border-box;
-            font-family: inherit;
         }
         
         input:focus {
             border-color: #9b3a8a;
-            background: rgba(255,255,255,0.12);
-            box-shadow: 0 0 12px rgba(155,58,138,0.3);
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 0 10px rgba(155,58,138,0.3);
         }
         
         input::placeholder {
-            color: rgba(255,255,255,0.45);
-            font-size: 13px;
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
         }
         
         button {
@@ -258,14 +253,14 @@ if (is_logged_in()) {
             font-size: 14px;
             cursor: pointer;
             transition: all 0.25s ease;
-            margin-top: 14px;
-            box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+            margin-top: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
         
         button:hover {
-            transform: translateY(-2px);
+            transform: translateY(-1px);
             background: linear-gradient(105deg, #8f0f7a, #5a0f48);
-            box-shadow: 0 8px 18px rgba(122,10,104,0.4);
+            box-shadow: 0 6px 15px rgba(122,10,104,0.4);
         }
         
         button:active {
@@ -283,30 +278,25 @@ if (is_logged_in()) {
             text-align: left;
         }
         
-        /* Responsive untuk tablet */
+        /* Tablet */
         @media (max-width: 768px) {
             .container {
                 max-width: 320px;
                 padding: 24px 22px;
+                background: rgba(0, 0, 0, 0.4);
             }
             
             .container h2 {
                 font-size: 24px;
             }
-            
-            .sound-control {
-                width: 44px;
-                height: 44px;
-                bottom: 20px;
-                right: 20px;
-            }
         }
         
-        /* Responsive untuk HP */
+        /* HP */
         @media (max-width: 480px) {
             .container {
                 max-width: 88%;
                 padding: 22px 20px;
+                background: rgba(0, 0, 0, 0.45);
             }
             
             .container h2 {
@@ -314,7 +304,7 @@ if (is_logged_in()) {
             }
             
             .subtitle {
-                font-size: 11px;
+                font-size: 10px;
                 margin-bottom: 20px;
             }
             
@@ -353,8 +343,8 @@ if (is_logged_in()) {
         }
         
         .loading-spinner {
-            width: 38px;
-            height: 38px;
+            width: 36px;
+            height: 36px;
             border: 3px solid rgba(255,255,255,0.2);
             border-top-color: #9b3a8a;
             border-radius: 50%;
@@ -368,9 +358,9 @@ if (is_logged_in()) {
         
         .volume-indicator {
             position: fixed;
-            bottom: 90px;
-            right: 30px;
-            background: rgba(0,0,0,0.6);
+            bottom: 80px;
+            right: 28px;
+            background: rgba(0,0,0,0.5);
             padding: 5px 12px;
             border-radius: 30px;
             font-size: 11px;
@@ -383,19 +373,10 @@ if (is_logged_in()) {
         
         @media (max-width: 480px) {
             .volume-indicator {
-                bottom: 75px;
-                right: 24px;
+                bottom: 72px;
+                right: 22px;
                 font-size: 10px;
                 padding: 4px 10px;
-            }
-        }
-        
-        /* Desktop volume indicator adjust */
-        @media (min-width: 1024px) {
-            .volume-indicator {
-                bottom: 95px;
-                right: 35px;
-                font-size: 12px;
             }
         }
     </style>
@@ -403,7 +384,7 @@ if (is_logged_in()) {
     <body>
     <div class="loading" id="loading">
         <div class="loading-spinner"></div>
-        <div>loading cinematic experience ..</div>
+        <div>loading experience ..</div>
     </div>
     
     <div class="video-container">
@@ -451,7 +432,7 @@ if (is_logged_in()) {
             function showMsg(msg, isOnStyle) {
                 volumeIndicator.textContent = msg;
                 volumeIndicator.style.opacity = '1';
-                volumeIndicator.style.backgroundColor = isOnStyle ? 'rgba(122,10,104,0.85)' : 'rgba(0,0,0,0.65)';
+                volumeIndicator.style.backgroundColor = isOnStyle ? 'rgba(122,10,104,0.8)' : 'rgba(0,0,0,0.55)';
                 clearTimeout(indicatorTimeout);
                 indicatorTimeout = setTimeout(() => {
                     volumeIndicator.style.opacity = '0';
@@ -507,13 +488,13 @@ if (is_logged_in()) {
                     setTimeout(() => loading.style.display = 'none', 400);
                 });
                 video.addEventListener('error', () => {
-                    loading.innerHTML = '<div class="loading-spinner"></div><div>loading video failed, but you can login</div>';
+                    loading.innerHTML = '<div class="loading-spinner"></div><div>video not found</div>';
                     setTimeout(() => loading.style.display = 'none', 1800);
                 });
                 loadPref();
                 setTimeout(() => {
                     if(loading.style.display !== 'none') loading.style.display = 'none';
-                }, 4000);
+                }, 3500);
             }
             
             if(soundControl) soundControl.addEventListener('click', (e) => {
